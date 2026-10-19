@@ -145,6 +145,12 @@ config SPL_ATMEL_TCB_TIMER
 	  Select this to enable the use of the timer counter as a monotonic
 	  counter in SPL.
 
+config BCM2153_TIMER
+	bool "Broadcom BCM2153 timer support"
+	depends on TIMER
+	help
+	  Use the first BCM2153 GPT channel with its 32.768 kHz clock.
+
 config CADENCE_TTC_TIMER
 	bool "Cadence TTC (Triple Timer Counter)"
 	depends on TIMER && ARCH_ZYNQMP_R5

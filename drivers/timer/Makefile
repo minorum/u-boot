@@ -13,6 +13,7 @@ obj-$(CONFIG_AST_IBEX_TIMER)	+= ast_ibex_timer.o
 obj-$(CONFIG_ATCPIT100_TIMER) += atcpit100_timer.o
 obj-$(CONFIG_$(PHASE_)ATMEL_PIT_TIMER) += atmel_pit_timer.o
 obj-$(CONFIG_$(PHASE_)ATMEL_TCB_TIMER) += atmel_tcb_timer.o
+obj-$(CONFIG_BCM2153_TIMER)	+= bcm2153_timer.o
 obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence-ttc.o
 obj-$(CONFIG_DESIGNWARE_APB_TIMER)	+= dw-apb-timer.o
 obj-$(CONFIG_GXP_TIMER)		+= gxp-timer.o
