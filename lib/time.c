@@ -149,11 +149,12 @@ ulong __weak get_timer(ulong base)
 
 static uint64_t notrace tick_to_time_us(uint64_t tick)
 {
-	ulong div = get_tbclk() / 1000;
+	ulong div = get_tbclk();
+	uint64_t remainder = do_div(tick, div);
 
-	tick *= CONFIG_SYS_HZ;
-	do_div(tick, div);
-	return tick;
+	remainder *= CONFIG_SYS_HZ * 1000;
+	do_div(remainder, div);
+	return tick * (CONFIG_SYS_HZ * 1000) + remainder;
 }
 
 uint64_t __weak get_timer_us(uint64_t base)
