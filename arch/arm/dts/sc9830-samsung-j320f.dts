@@ -4,4 +4,14 @@
 / {
 	model = "Samsung Galaxy J3 SM-J320F";
 	compatible = "samsung,j320f", "sprd,sc9830";
+
+	framebuffer@9eb74000 {
+		compatible = "simple-framebuffer";
+		reg = <0x9eb74000 0x384000>;
+		width = <720>;
+		height = <1280>;
+		stride = <2880>;
+		format = "x8r8g8b8";
+		rot = <0>;
+	};
 };
