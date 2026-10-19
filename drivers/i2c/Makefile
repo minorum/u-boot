@@ -16,6 +16,7 @@ obj-$(CONFIG_SYS_I2C_ASPEED) += ast_i2c.o
 obj-$(CONFIG_SYS_I2C_AST2600) += ast2600_i2c.o
 obj-$(CONFIG_SYS_I2C_AT91) += at91_i2c.o
 obj-$(CONFIG_SYS_I2C_CADENCE) += i2c-cdns.o
+obj-$(CONFIG_SYS_I2C_BCM2153) += bcm2153_i2c.o
 obj-$(CONFIG_SYS_I2C_CA) += i2c-cortina.o
 obj-$(CONFIG_SYS_I2C_DAVINCI) += davinci_i2c.o
 obj-$(CONFIG_SYS_I2C_DDC_MTK) += mtk_mt8195_i2c_ddc.o

@@ -815,6 +815,15 @@ config SYS_I2C_SPACEMIT_K1
 	  Support for Spacemit I2C controller. It's based on
 	  Driver Model.
 
+config SYS_I2C_BCM2153
+	bool "Broadcom BCM2153 I2C controller"
+	depends on DM_I2C && CLK
+	help
+	  Enable polled byte transfers on the BCM2153 BSC controller.
+	  Requires an input clock provider and standard timing mode.
+	  Supports seven-bit addresses and explicit STOP messages.
+	  No transfer retries or automatic bus recovery are performed.
+
 source "drivers/i2c/muxes/Kconfig"
 
 endif
