@@ -4,6 +4,7 @@
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 
 obj-y	= cpu.o
+extra-$(CONFIG_CPU_ARM11) += start.o
 
 ifneq ($(CONFIG_XPL_BUILD),y)
 obj-$(CONFIG_EFI_LOADER) += sctlr.o

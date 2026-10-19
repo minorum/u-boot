@@ -344,6 +344,11 @@ config CPU_ARM946ES
 	select SYS_CACHE_SHIFT_5
 	imply SYS_ARM_MMU
 
+config CPU_ARM11
+	bool
+	select SYS_CACHE_SHIFT_5
+	imply SYS_ARM_MMU
+
 config CPU_ARM1136
 	bool
 	select SYS_CACHE_SHIFT_5
@@ -389,6 +394,7 @@ config CPU_V8M
 	select CPU_V7M_V8M
 
 config SYS_CPU
+	default "arm11" if CPU_ARM11
 	default "arm720t" if CPU_ARM720T
 	default "arm920t" if CPU_ARM920T
 	default "arm926ejs" if CPU_ARM926EJS
@@ -403,6 +409,7 @@ config SYS_CPU
 
 config SYS_ARM_ARCH
 	int
+	default 6 if CPU_ARM11
 	default 4 if CPU_ARM720T
 	default 4 if CPU_ARM920T
 	default 5 if CPU_ARM926EJS
@@ -622,6 +629,18 @@ config S5P
 choice
 	prompt "Target select"
 	default TARGET_HIKEY
+
+config TARGET_GT_S5620
+	bool "Samsung GT-S5620 (stock-initialized RAM)"
+	select CPU_ARM11
+	select DM
+	select OF_CONTROL
+	select SUPPORT_OF_CONTROL
+	help
+	  Build a RAM-resident second stage for the Samsung GT-S5620.
+	  Requires stock firmware to initialize DDR before entry.
+	  Uses the common ARM11 startup and high exception vectors.
+	  This target does not provide a cold-boot or flashing image.
 
 config ARCH_AIROHA
 	bool "Airoha SoCs"
@@ -2506,6 +2525,7 @@ source "board/isee/igep003x/Kconfig"
 source "board/kontron/sl28/Kconfig"
 source "board/myir/mys_6ulx/Kconfig"
 source "board/samsung/common/Kconfig"
+source "board/samsung/gt-s5620/Kconfig"
 source "board/siemens/common/Kconfig"
 source "board/seeed/npi_imx6ull/Kconfig"
 source "board/socionext/developerbox/Kconfig"

@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+
+&osc32k {
+	bootph-all;
+};
+
+&gpt {
+	bootph-all;
+	status = "okay";
+};

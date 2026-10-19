@@ -1,0 +1,12 @@
+if TARGET_GT_S5620
+
+config SYS_BOARD
+	default "gt-s5620"
+
+config SYS_VENDOR
+	default "samsung"
+
+config SYS_CONFIG_NAME
+	default "gt-s5620"
+
+endif
