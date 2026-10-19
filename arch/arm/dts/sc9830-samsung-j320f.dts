@@ -5,7 +5,3 @@
 	model = "Samsung Galaxy J3 SM-J320F";
 	compatible = "samsung,j320f", "sprd,sc9830";
 };
-
-&emmc {
-	status = "disabled";
-};
