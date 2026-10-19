@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 
+/ {
+	stock-lcd@8030000 {
+		compatible = "samsung,gt-s5620-stock-lcd";
+		reg = <0x08030000 0x20>;
+		bootph-all;
+	};
+};
+
 &osc32k {
 	bootph-all;
 };

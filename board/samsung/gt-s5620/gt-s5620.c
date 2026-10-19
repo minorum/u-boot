@@ -2,9 +2,19 @@
 
 #include <config.h>
 #include <init.h>
+#include <stdio.h>
 #include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+int checkboard(void)
+{
+	u32 midr;
+
+	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (midr));
+	printf("CPU MIDR: %08x\n", midr);
+	return 0;
+}
 
 int board_init(void)
 {

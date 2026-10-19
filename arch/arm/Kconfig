@@ -636,6 +636,7 @@ config TARGET_GT_S5620
 	select DM
 	select OF_CONTROL
 	select SUPPORT_OF_CONTROL
+	select VIDEO_DAMAGE if VIDEO
 	help
 	  Build a RAM-resident second stage for the Samsung GT-S5620.
 	  Requires stock firmware to initialize DDR before entry.
