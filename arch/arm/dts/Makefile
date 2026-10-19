@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0+
+dtb-$(CONFIG_TARGET_SAMSUNG_J320FN) += sc9830-samsung-j320fn.dtb
+dtb-$(CONFIG_TARGET_SAMSUNG_J320F) += sc9830-samsung-j320f.dtb
 
 dtb-$(CONFIG_TARGET_SMARTWEB) += at91sam9260-smartweb.dtb
 dtb-$(CONFIG_TARGET_TAURUS) += at91sam9g20-taurus.dtb

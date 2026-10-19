@@ -553,7 +553,8 @@ static int dwc2_udc_irq(int irq, void *_dev)
 			"\tReset interrupt - (GOTGCTL):0x%x\n", usb_status);
 		writel(GINTSTS_USBRST, &reg->global_regs.gintsts);
 
-		if (usb_status & (GOTGCTL_ASESVLD | GOTGCTL_BSESVLD)) {
+		if (dev->pdata->force_device_mode ||
+		    (usb_status & (GOTGCTL_ASESVLD | GOTGCTL_BSESVLD))) {
 			if (reset_available) {
 				debug_cond(DEBUG_ISR,
 					"\t\tOTG core got reset (%d)!!\n",

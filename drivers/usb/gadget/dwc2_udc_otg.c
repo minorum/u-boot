@@ -468,6 +468,7 @@ static void reconfig_usbd(struct dwc2_udc *dev)
 	u32 dflt_gusbcfg;
 	u32 rx_fifo_sz, tx_fifo_sz, np_tx_fifo_sz;
 	u32 max_hw_ep;
+	u32 device_speed;
 	int pdata_hw_ep;
 
 	dwc2_core_reset(reg);
@@ -492,6 +493,8 @@ static void reconfig_usbd(struct dwc2_udc *dev)
 
 	if (dev->pdata->usb_gusbcfg)
 		dflt_gusbcfg = dev->pdata->usb_gusbcfg;
+	if (dev->pdata->force_device_mode)
+		dflt_gusbcfg = (dflt_gusbcfg & ~BIT(29)) | BIT(30);
 
 	writel(dflt_gusbcfg, &reg->global_regs.gusbcfg);
 
@@ -505,8 +508,10 @@ static void reconfig_usbd(struct dwc2_udc *dev)
 
 	/* 5. Configure OTG Core to initial settings of device mode.*/
 	/* [][1: full speed(30Mhz) 0:high speed]*/
+	device_speed = dev->pdata->maximum_speed == USB_SPEED_FULL ?
+		DCFG_DEVSPD_FS : DCFG_DEVSPD_HS;
 	writel(FIELD_PREP(DCFG_EPMISCNT_MASK, 1) |
-	       FIELD_PREP(DCFG_DEVSPD_MASK, DCFG_DEVSPD_HS), &reg->device_regs.dcfg);
+	       FIELD_PREP(DCFG_DEVSPD_MASK, device_speed), &reg->device_regs.dcfg);
 
 	mdelay(1);
 
@@ -914,7 +919,7 @@ int dwc2_udc_probe(struct dwc2_plat_otg_data *pdata)
 
 	reg = (struct dwc2_core_regs *)pdata->regs_otg;
 
-	dev->gadget.is_dualspeed = 1;	/* Hack only*/
+	dev->gadget.is_dualspeed = pdata->maximum_speed != USB_SPEED_FULL;
 	dev->gadget.is_otg = 0;
 	dev->gadget.is_a_peripheral = 0;
 	dev->gadget.b_hnp_enable = 0;
@@ -994,6 +999,13 @@ static int dwc2_udc_otg_of_to_plat(struct udevice *dev)
 	int ret;
 
 	plat->regs_otg = dev_read_addr(dev);
+	plat->force_device_mode =
+		usb_get_dr_mode(dev_ofnode(dev)) == USB_DR_MODE_PERIPHERAL;
+	plat->maximum_speed = usb_get_maximum_speed(dev_ofnode(dev));
+	if (plat->maximum_speed != USB_SPEED_UNKNOWN &&
+	    plat->maximum_speed != USB_SPEED_FULL &&
+	    plat->maximum_speed != USB_SPEED_HIGH)
+		return -EINVAL;
 
 	plat->rx_fifo_sz = dev_read_u32_default(dev, "g-rx-fifo-size", 0);
 	plat->np_tx_fifo_sz = dev_read_u32_default(dev, "g-np-tx-fifo-size", 0);

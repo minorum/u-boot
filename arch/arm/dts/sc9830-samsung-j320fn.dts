@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+#include <dt-bindings/power/sprd,sc9830-reboot-mode.h>
+
+/ {
+	model = "Samsung Galaxy J3 SM-J320FN";
+	compatible = "samsung,j3xnlte", "sprd,sc9830";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	chosen {
+		tick-timer = &timer;
+	};
+
+	aliases {
+		mmc0 = &emmc;
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x07800000>;
+	};
+
+	reboot-mode@f90 {
+		compatible = "sprd,sc9830-reboot-mode";
+		reg = <0xf90 0x4>;
+		mode-normal = <SC9830_BOOT_NORMAL>;
+		mode-recovery = <SC9830_BOOT_RECOVERY>;
+		mode-bootloader = <SC9830_BOOT_FASTBOOT>;
+	};
+
+	timer: timer@40050020 {
+		compatible = "sprd,sc9830-uboot-timer";
+		reg = <0x40050020 0x20>;
+		clock-frequency = <32768>;
+		bootph-all;
+	};
+
+	emmc: mmc@20600000 {
+		compatible = "sprd,sc9830-sdhci";
+		reg = <0x20600000 0x1000>;
+		bus-width = <1>;
+		max-frequency = <12000000>;
+		non-removable;
+	};
+
+	usb@20200000 {
+		compatible = "snps,dwc2";
+		reg = <0x20200000 0x1000>;
+		dr_mode = "peripheral";
+		maximum-speed = "full-speed";
+		g-rx-fifo-size = <256>;
+		g-np-tx-fifo-size = <128>;
+		g-tx-fifo-size = <128 128 128 128 128 128 128 128
+				  128 128 128 128 128 128 128>;
+	};
+};

@@ -1,0 +1,12 @@
+if TARGET_SAMSUNG_J320FN || TARGET_SAMSUNG_J320F
+
+config SYS_BOARD
+	default "j320fn"
+
+config SYS_VENDOR
+	default "samsung"
+
+config SYS_CONFIG_NAME
+	default "j320fn"
+
+endif

@@ -9,6 +9,7 @@
 #define __DWC2_USB_GADGET
 
 #include <dm/ofnode.h>
+#include <linux/usb/ch9.h>
 
 #define PHY0_SLEEP              (1 << 5)
 #define DWC2_MAX_HW_ENDPOINTS	16
@@ -22,6 +23,8 @@ struct dwc2_plat_otg_data {
 	unsigned int    usb_phy_ctrl;
 	unsigned int    usb_flags;
 	unsigned int	usb_gusbcfg;
+	enum usb_device_speed maximum_speed;
+	bool		force_device_mode;
 	unsigned int	rx_fifo_sz;
 	unsigned int	np_tx_fifo_sz;
 	unsigned int	tx_fifo_sz;

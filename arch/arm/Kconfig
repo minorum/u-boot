@@ -1261,6 +1261,26 @@ config ARCH_SUNXI
 	imply USB_GADGET
 	imply WDT
 
+config TARGET_SAMSUNG_J320FN
+	bool "Samsung Galaxy J3 SM-J320FN"
+	select CPU_V7A
+	select DM
+	select DM_SERIAL
+	select OF_CONTROL
+	select TIMER
+	select MMC_SDHCI_IO_ACCESSORS if MMC_SDHCI
+	select SKIP_LOWLEVEL_INIT
+
+config TARGET_SAMSUNG_J320F
+	bool "Samsung Galaxy J3 SM-J320F"
+	select CPU_V7A
+	select DM
+	select DM_SERIAL
+	select OF_CONTROL
+	select TIMER
+	select MMC_SDHCI_IO_ACCESSORS if MMC_SDHCI
+	select SKIP_LOWLEVEL_INIT
+
 config ARCH_U8500
 	bool "ST-Ericsson U8500 Series"
 	select CPU_V7A
@@ -2463,6 +2483,7 @@ source "board/isee/igep003x/Kconfig"
 source "board/kontron/sl28/Kconfig"
 source "board/myir/mys_6ulx/Kconfig"
 source "board/samsung/common/Kconfig"
+source "board/samsung/j320fn/Kconfig"
 source "board/siemens/common/Kconfig"
 source "board/seeed/npi_imx6ull/Kconfig"
 source "board/socionext/developerbox/Kconfig"
