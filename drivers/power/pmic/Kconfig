@@ -217,6 +217,15 @@ config DM_PMIC_MAX77663
 	  4 DC-to-DC Step-Down (SD) Regulators, 9 Low-Dropout Linear (LDO) Regulators,
 	  8 GPIOs, Real-Time Clock (RTC) and more with I2C Compatible Interface.
 
+config DM_PMIC_BCM59035
+	bool "BCM59035 PMIC"
+	depends on DM_I2C && DM_REGULATOR
+	help
+	  Enable byte register access and HCLDO2 child binding for BCM59035.
+	  Register reads separate address selection with STOP. The HCLDO2
+	  regulator uses the GT-S5620 stock low-power enable and off values
+	  with register readback. Voltage selection is not implemented.
+
 config DM_PMIC_MAX77686
 	bool "Enable Driver Model for PMIC MAX77686"
 	help

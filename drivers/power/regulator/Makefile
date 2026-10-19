@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0+
+obj-$(CONFIG_DM_PMIC_BCM59035) += bcm59035.o
 #
 # Copyright (C) 2015 Samsung Electronics
 # Przemyslaw Marczak <p.marczak@samsung.com>
