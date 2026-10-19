@@ -7,3 +7,5 @@ F:	include/configs/gt-s5620.h
 F:	arch/arm/dts/bcm2153-samsung-gt-s5620-u-boot.dtsi
 F:	dts/upstream/src/arm/broadcom/bcm2153*
 F:	dts/upstream/Bindings/arm/bcm/brcm,bcm2153.yaml
+F:	dts/upstream/Bindings/i2c/brcm,bcm2153-i2c.yaml
+F:	dts/upstream/Bindings/mfd/brcm,bcm59035.yaml
