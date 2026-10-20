@@ -17,6 +17,7 @@ struct bcm2153_sdhci_priv {
 	struct sdhci_host host;
 	void __iomem *clock;
 	u16 transfer_mode;
+	u16 block_size;
 };
 
 static u16 bcm2153_sdhci_readw(struct sdhci_host *host, int reg)
@@ -36,6 +37,15 @@ static void bcm2153_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 	u32 shift = (reg & 3) * 8;
 	u32 old;
 
+	if (reg == SDHCI_BLOCK_SIZE) {
+		priv->block_size = val;
+		return;
+	}
+	if (reg == SDHCI_BLOCK_COUNT) {
+		writel((u32)val << 16 | priv->block_size,
+		       host->ioaddr + SDHCI_BLOCK_SIZE);
+		return;
+	}
 	if (reg == SDHCI_TRANSFER_MODE) {
 		priv->transfer_mode = val;
 		return;
