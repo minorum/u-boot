@@ -497,6 +497,10 @@ int video_sync(struct udevice *vid, bool force)
 	struct video_ops *ops = video_get_ops(vid);
 	int ret;
 
+	if (CONFIG_IS_ENABLED(CYCLIC) && !force &&
+	    get_timer(priv->last_sync) < CONFIG_VIDEO_SYNC_MS)
+		return 0;
+
 	if (IS_ENABLED(CONFIG_VIDEO_COPY))
 		video_flush_copy(vid);
 
@@ -505,10 +509,6 @@ int video_sync(struct udevice *vid, bool force)
 		if (ret)
 			return ret;
 	}
-
-	if (CONFIG_IS_ENABLED(CYCLIC) && !force &&
-	    get_timer(priv->last_sync) < CONFIG_VIDEO_SYNC_MS)
-		return 0;
 
 	video_flush_dcache(vid, false);
 

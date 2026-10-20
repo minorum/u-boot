@@ -20,10 +20,12 @@ static int gt_s5620_lcd_write(struct gt_s5620_lcd_priv *priv, int offset,
 {
 	u32 status;
 
-	priv->error = readl_poll_timeout(priv->base + 0x1c, status,
-					!(status & LCD_BUSY), 10000);
-	if (priv->error)
-		return priv->error;
+	if (readl(priv->base + 0x1c) & LCD_BUSY) {
+		priv->error = readl_poll_timeout(priv->base + 0x1c, status,
+						!(status & LCD_BUSY), 10000);
+		if (priv->error)
+			return priv->error;
+	}
 	writel(value, priv->base + offset);
 	return 0;
 }
