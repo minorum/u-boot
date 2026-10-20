@@ -47,6 +47,7 @@
 };
 
 &sd1 {
+	broken-cd;
 	pinctrl-names = "powered";
 	pinctrl-0 = <&sd1_clear &sd1_data &sd1_command>;
 	status = "okay";
