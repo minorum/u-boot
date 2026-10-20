@@ -16,3 +16,15 @@
 	bootph-all;
 	status = "okay";
 };
+
+&bsc0 {
+	status = "okay";
+};
+
+&hcldo2 {
+	regulator-always-on;
+};
+
+&sd1 {
+	status = "okay";
+};
