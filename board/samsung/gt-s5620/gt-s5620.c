@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 
 #include <config.h>
+#include <env.h>
 #include <init.h>
 #include <stdio.h>
 #include <asm/global_data.h>
@@ -13,6 +14,19 @@ int checkboard(void)
 
 	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (midr));
 	printf("CPU MIDR: %08x\n", midr);
+	return env_set_hex("cpu_midr", midr);
+}
+
+int board_late_init(void)
+{
+	puts("USB: waiting for host connection\n");
+	if (env_set("stdout", "vidconsole,usbacm")) {
+		puts("USB console unavailable\n");
+		return 0;
+	}
+	if (env_set("stderr", "vidconsole,usbacm") ||
+	    env_set("stdin", "usbacm"))
+		puts("USB console assignment failed\n");
 	return 0;
 }
 

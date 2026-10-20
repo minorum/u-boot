@@ -2,3 +2,4 @@
 
 obj-y += gt-s5620.o lowlevel_init.o
 obj-$(CONFIG_VIDEO) += lcd.o
+obj-$(CONFIG_USB_GADGET_DWC2_OTG) += usb.o
