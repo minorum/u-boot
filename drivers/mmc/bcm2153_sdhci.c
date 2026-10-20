@@ -2,6 +2,8 @@
 
 #include <dm.h>
 #include <errno.h>
+#include <dm/pinctrl.h>
+#include <power/regulator.h>
 #include <sdhci.h>
 #include <linux/delay.h>
 
@@ -98,6 +100,20 @@ static const struct sdhci_ops bcm2153_sdhci_ops = {
 	.set_clock = bcm2153_sdhci_set_clock,
 };
 
+static int bcm2153_sdhci_prepare(struct udevice *dev)
+{
+	struct udevice *supply;
+	int ret;
+
+	ret = device_get_supply_regulator(dev, "vmmc-supply", &supply);
+	if (ret)
+		return ret;
+	ret = regulator_set_enable(supply, true);
+	if (ret)
+		return ret;
+	return pinctrl_select_state(dev, "powered");
+}
+
 static int bcm2153_sdhci_probe(struct udevice *dev)
 {
 	struct bcm2153_sdhci_plat *plat = dev_get_plat(dev);
@@ -116,6 +132,10 @@ static int bcm2153_sdhci_probe(struct udevice *dev)
 	host->max_clk = dev_read_u32_default(dev, "clock-frequency", 0);
 	if (host->max_clk != BCM2153_SDIO_RATE)
 		return -EINVAL;
+
+	ret = bcm2153_sdhci_prepare(dev);
+	if (ret)
+		return ret;
 
 	if (readl(host->ioaddr + SDHCI_CLOCK_CONTROL) & BIT(24))
 		return -EBUSY;

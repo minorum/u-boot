@@ -1,6 +1,27 @@
 // SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 
 / {
+	pinctrl: pinctrl@8880000 {
+		compatible = "pinctrl-single";
+		reg = <0x08880000 0x24>;
+		#pinctrl-cells = <2>;
+		pinctrl-single,register-width = <32>;
+		pinctrl-single,function-mask = <1>;
+		pinctrl-single,bit-per-mux;
+
+		sd1_clear: sd1-clear-pins {
+			pinctrl-single,bits = <0x0c 0x00000000 0xfc000000>;
+		};
+
+		sd1_data: sd1-data-pins {
+			pinctrl-single,bits = <0x0c 0x50000000 0xfc000000>;
+		};
+
+		sd1_command: sd1-command-pins {
+			pinctrl-single,bits = <0x20 0x38000000 0x38000000>;
+		};
+	};
+
 	stock-lcd@8030000 {
 		compatible = "samsung,gt-s5620-stock-lcd";
 		reg = <0x08030000 0x20>;
@@ -26,5 +47,7 @@
 };
 
 &sd1 {
+	pinctrl-names = "powered";
+	pinctrl-0 = <&sd1_clear &sd1_data &sd1_command>;
 	status = "okay";
 };
