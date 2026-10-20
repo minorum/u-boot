@@ -25,6 +25,7 @@ struct bcm2153_i2c_priv {
 	ulong input_rate;
 	uint rate;
 	uint turnaround_us;
+	bool failed;
 };
 
 static int bcm2153_i2c_idle(struct bcm2153_i2c_priv *priv)
@@ -62,7 +63,8 @@ static int bcm2153_i2c_command(struct bcm2153_i2c_priv *priv, u8 command)
 	if (ret)
 		return ret;
 	writeb(0x8f, priv->base + BSC_ISR);
-	writeb((readb(priv->base + BSC_CS) & ~0x0e) | command,
+	writeb((readb(priv->base + BSC_CS) &
+		(command == 4 ? 0xf9 : 0xf1)) | command,
 	       priv->base + BSC_CS);
 	return bcm2153_i2c_complete(priv);
 }
@@ -81,24 +83,25 @@ static int bcm2153_i2c_send(struct bcm2153_i2c_priv *priv, u8 value)
 static int bcm2153_i2c_xfer(struct udevice *bus, struct i2c_msg *msgs, int count)
 {
 	struct bcm2153_i2c_priv *priv = dev_get_priv(bus);
-	bool started = false;
-	int i, ret, stop;
+	int i, ret;
 	uint j;
 
 	if (count < 0 || (count && !msgs))
 		return -EINVAL;
 	for (i = 0; i < count; i++) {
 		if (msgs[i].addr > 0x7f ||
-		    (msgs[i].flags & ~(I2C_M_RD | I2C_M_STOP)))
+		    (msgs[i].flags & ~(I2C_M_RD | I2C_M_STOP)) ||
+		    (i + 1 < count && !(msgs[i].flags & I2C_M_STOP)))
 			return -EOPNOTSUPP;
 		if (msgs[i].len && !msgs[i].buf)
 			return -EINVAL;
 	}
+	if (priv->failed)
+		return -ESHUTDOWN;
 	for (i = 0; i < count; i++) {
-		ret = bcm2153_i2c_command(priv, started ? 0x0a : 2);
+		ret = bcm2153_i2c_command(priv, 2);
 		if (ret)
 			goto out;
-		started = true;
 		ret = bcm2153_i2c_send(priv, msgs[i].addr << 1 |
 				     !!(msgs[i].flags & I2C_M_RD));
 		if (ret)
@@ -115,21 +118,14 @@ static int bcm2153_i2c_xfer(struct udevice *bus, struct i2c_msg *msgs, int count
 			if (ret)
 				goto out;
 		}
-		if (msgs[i].flags & I2C_M_STOP) {
-			ret = bcm2153_i2c_command(priv, 4);
-			started = false;
-			if (ret)
-				return ret;
-		}
+		ret = bcm2153_i2c_command(priv, 4);
+		if (ret)
+			goto out;
 	}
-	return started ? bcm2153_i2c_command(priv, 4) : 0;
+	return 0;
 
 out:
-	if (ret != -ETIMEDOUT) {
-		stop = bcm2153_i2c_command(priv, 4);
-		if (stop)
-			return stop;
-	}
+	priv->failed = true;
 	return ret;
 }
 
