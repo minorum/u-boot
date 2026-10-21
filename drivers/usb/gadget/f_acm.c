@@ -16,6 +16,7 @@
 #include <malloc.h>
 #include <memalign.h>
 #include <stdio_dev.h>
+#include <time.h>
 #include <version.h>
 #include <watchdog.h>
 
@@ -25,6 +26,7 @@
 #include <linux/usb/cdc.h>
 
 #define REQ_SIZE_MAX	512
+#define ACM_TX_TIMEOUT_MS	1000
 
 struct f_acm {
 	int ctrl_id;
@@ -293,6 +295,9 @@ static void acm_rx_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_acm *f_acm = req->context;
 
+	if (req->status)
+		return;
+
 	buf_push(&f_acm->rx_buf, req->buf, req->actual);
 
 	/* Queue RX req again */
@@ -451,6 +456,10 @@ static void acm_disable(struct usb_function *f)
 {
 	struct f_acm *f_acm = func_to_acm(f);
 
+	f_acm->connected = false;
+	f_acm->handshake_bits = 0;
+	f_acm->tx_on = false;
+
 	usb_ep_disable(f_acm->ep_out);
 	usb_ep_disable(f_acm->ep_in);
 	usb_ep_disable(f_acm->ep_notify);
@@ -488,12 +497,16 @@ static struct usb_gadget_strings *acm_strings[] = {
 
 static void __acm_tx(struct f_acm *f_acm)
 {
+	ulong start = get_timer(0);
 	int len, ret;
 
 	do {
 		dm_usb_gadget_handle_interrupts(f_acm->udc);
 
-		if (!(f_acm->handshake_bits & ACM_CTRL_DTR))
+		if (!f_acm->connected || !(f_acm->handshake_bits & ACM_CTRL_DTR))
+			break;
+
+		if (get_timer(start) >= ACM_TX_TIMEOUT_MS)
 			break;
 
 		if (!f_acm->tx_on)
@@ -510,6 +523,7 @@ static void __acm_tx(struct f_acm *f_acm)
 			break;
 
 		f_acm->tx_on = false;
+		start = get_timer(0);
 
 		/* Do not reset the watchdog, if TX is stuck there is probably
 		 * a real issue.
