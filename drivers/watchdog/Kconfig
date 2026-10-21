@@ -1,5 +1,11 @@
 menu "Watchdog Timer Support"
 
+config WDT_BCM2153
+	bool "Broadcom BCM2153 AP watchdog"
+	depends on WDT && TARGET_GT_S5620
+	help
+	  Support the BCM2153 application processor watchdog and reset output.
+
 config WATCHDOG
 	bool "Enable U-Boot watchdog reset"
 	depends on !HW_WATCHDOG

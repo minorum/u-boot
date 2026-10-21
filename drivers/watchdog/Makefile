@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0+
+obj-$(CONFIG_WDT_BCM2153) += bcm2153_wdt.o
 #
 # (C) Copyright 2008
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
