@@ -43,6 +43,12 @@ config VPL_SYSRESET
 
 if SYSRESET
 
+config SYSRESET_BCM2153
+	bool "Broadcom BCM2153 software reset"
+	depends on TARGET_GT_S5620
+	help
+	  Request a BCM2153 system reset through its 16-bit reset register.
+
 config SYSRESET_PRINT_RESETINFO
 	bool "Print reset information during boot"
 	default y if SANDBOX
