@@ -245,6 +245,13 @@ static void __maybe_unused do_psci_probe(void)
 }
 
 #if IS_ENABLED(CONFIG_EFI_LOADER) && IS_ENABLED(CONFIG_PSCI_RESET)
+static const u32 __efi_runtime_rodata psci_reset_functions[] = {
+	[EFI_RESET_COLD] = PSCI_0_2_FN_SYSTEM_RESET,
+	[EFI_RESET_WARM] = PSCI_0_2_FN_SYSTEM_RESET,
+	[EFI_RESET_SHUTDOWN] = PSCI_0_2_FN_SYSTEM_OFF,
+	[EFI_RESET_PLATFORM_SPECIFIC] = PSCI_0_2_FN_SYSTEM_RESET,
+};
+
 efi_status_t efi_reset_system_init(void)
 {
 	do_psci_probe();
@@ -256,13 +263,8 @@ void __efi_runtime EFIAPI efi_reset_system(enum efi_reset_type reset_type,
 					   unsigned long data_size,
 					   void *reset_data)
 {
-	if (reset_type == EFI_RESET_COLD ||
-	    reset_type == EFI_RESET_WARM ||
-	    reset_type == EFI_RESET_PLATFORM_SPECIFIC) {
-		invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-	} else if (reset_type == EFI_RESET_SHUTDOWN) {
-		invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-	}
+	if (reset_type < ARRAY_SIZE(psci_reset_functions))
+		invoke_psci_fn(psci_reset_functions[reset_type], 0, 0, 0);
 	while (1)
 		;
 }
