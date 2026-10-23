@@ -4,4 +4,6 @@ S:	Maintained
 F:	arch/arm/dts/mt6785*.dts*
 F:	board/xiaomi/begonia/
 F:	configs/xiaomi_begonia_defconfig
+F:	drivers/clk/mediatek/clk-mt6785.c
 F:	include/configs/xiaomi_begonia.h
+F:	include/dt-bindings/clock/mediatek,mt6785-clk.h
