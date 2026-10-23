@@ -301,6 +301,8 @@ static ulong mtk_clk_mux_get_rate(struct clk *clk, u32 off)
 	index = readl(priv->base + mux->mux_reg);
 	index &= mux->mux_mask << mux->mux_shift;
 	index = index >> mux->mux_shift;
+	if (index >= (u32)mux->num_parents)
+		return -EINVAL;
 	parent = &mux->parent[index];
 
 	return mtk_find_parent_rate(priv, clk, parent->id, parent->flags);
