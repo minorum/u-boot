@@ -3254,6 +3254,15 @@ config CMD_MESON
 	help
 	  Enable useful commands for the Meson Soc family developed by Amlogic Inc.
 
+config CMD_REBOOT_MODE
+	bool "reboot_mode - write a named reboot mode"
+	depends on DM_REBOOT_MODE
+	help
+	  Write a mode defined by the selected reboot-mode device's DT node.
+	  The backend must support writes. Unknown device or mode names fail
+	  without writing a mode. This command does not reset the system;
+	  use the normal reset command when a reset is required.
+
 config CMD_SPAWN
 	bool "spawn and wait commands"
 	depends on UTHREAD

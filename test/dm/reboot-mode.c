@@ -4,6 +4,7 @@
  */
 
 #include <dm.h>
+#include <command.h>
 #include <reboot-mode/reboot-mode.h>
 #include <env.h>
 #include <log.h>
@@ -119,3 +120,26 @@ static int dm_test_reboot_mode_nvmem_bit(struct unit_test_state *uts)
 
 DM_TEST(dm_test_reboot_mode_nvmem_bit,
 	UTF_PROBE_TEST | UTF_SCAN_FDT | UTF_FLAT_TREE);
+
+#if CONFIG_IS_ENABLED(CMD_REBOOT_MODE)
+static int dm_test_reboot_mode_command(struct unit_test_state *uts)
+{
+	struct udevice *rtc;
+	u8 before = 0x95, after;
+
+	ut_assertok(uclass_get_device_by_name(UCLASS_RTC, "rtc@43", &rtc));
+	ut_assertok(dm_rtc_write(rtc, REG_AUX2, &before, 1));
+	ut_assertok(run_command("reboot_mode reboot-mode-nvmem-bit test", 0));
+	ut_assertok(dm_rtc_read(rtc, REG_AUX2, &after, 1));
+	ut_asserteq(before | BIT(5), after);
+	ut_asserteq(1, run_command("reboot_mode reboot-mode-nvmem-bit missing", 0));
+	ut_asserteq(1, run_command("reboot_mode missing test", 0));
+	ut_asserteq(1, run_command("reboot_mode reboot-mode0 test", 0));
+	ut_assertok(dm_rtc_read(rtc, REG_AUX2, &after, 1));
+	ut_asserteq(before | BIT(5), after);
+	return 0;
+}
+
+DM_TEST(dm_test_reboot_mode_command,
+	UTF_PROBE_TEST | UTF_SCAN_FDT | UTF_FLAT_TREE);
+#endif

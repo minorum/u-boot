@@ -161,6 +161,7 @@ obj-$(CONFIG_CMD_READ_EDID) += read_edid.o
 obj-$(CONFIG_CMD_REGINFO) += reginfo.o
 obj-$(CONFIG_CMD_REMOTEPROC) += remoteproc.o
 obj-$(CONFIG_CMD_RNG) += rng.o
+obj-$(CONFIG_CMD_REBOOT_MODE) += reboot-mode.o
 obj-$(CONFIG_CMD_KASLRSEED) += kaslrseed.o
 obj-$(CONFIG_CMD_RKMTD) += rkmtd.o
 obj-$(CONFIG_CMD_ROCKUSB) += rockusb.o

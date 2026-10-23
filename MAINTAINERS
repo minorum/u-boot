@@ -1500,6 +1500,12 @@ S:	Maintained
 T:	git https://git.u-boot-project.org/u-boot/custodians/u-boot-nand-flash.git
 F:	drivers/mtd/nand/raw/
 
+REBOOT MODE COMMAND
+M:	minorum <mit.mis@gmail.com>
+S:	Maintained
+F:	cmd/reboot-mode.c
+F:	doc/usage/cmd/reboot_mode.rst
+
 RISC-V
 M:	Tim Ouyang <tim609@andestech.com>
 M:	Leo Liang <leo.liang@sifive.com>
