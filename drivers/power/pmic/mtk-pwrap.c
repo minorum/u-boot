@@ -10,6 +10,7 @@
 #include <clk.h>
 #include <dm.h>
 #include <dm/device_compat.h>
+#include <dm/lists.h>
 #include <linux/bitfield.h>
 #include <linux/err.h>
 #include <power/pmic.h>
@@ -815,8 +816,8 @@ static int mtk_pwrap_probe(struct udevice *dev)
 
 static int mtk_pwrap_bind(struct udevice *dev)
 {
-	ofnode pmic_node, regulators_node;
-	int children;
+	ofnode pmic_node, regulators_node, node;
+	int children, ret;
 	const struct pmic_child_info *pmic_children_info;
 
 	pmic_node = dev_read_first_subnode(dev);
@@ -846,6 +847,13 @@ static int mtk_pwrap_bind(struct udevice *dev)
 		dev_dbg(dev, "regulators subnode not found\n");
 	}
 
+	ofnode_for_each_subnode(node, pmic_node) {
+		if (!ofnode_is_enabled(node))
+			continue;
+		ret = lists_bind_fdt(dev, node, NULL, NULL, false);
+		if (ret)
+			return ret;
+	}
 	return 0;
 }
 
