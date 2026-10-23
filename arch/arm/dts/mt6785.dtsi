@@ -9,6 +9,11 @@
 	#size-cells = <2>;
 	interrupt-parent = <&sysirq>;
 
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
 	clk26m: oscillator-26m {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
