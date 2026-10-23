@@ -5,6 +5,7 @@
 
 #include <i2c_eeprom.h>
 #include <linker_lists.h>
+#include <malloc.h>
 #include <misc.h>
 #include <nvmem.h>
 #include <rtc.h>
@@ -13,7 +14,7 @@
 #include <dm/read.h>
 #include <dm/uclass.h>
 
-int nvmem_cell_read(struct nvmem_cell *cell, void *buf, size_t size)
+static int nvmem_cell_read_raw(struct nvmem_cell *cell, void *buf, size_t size)
 {
 	dev_dbg(cell->nvmem, "%s: off=%u size=%zu\n", __func__, cell->offset, size);
 	if (size != cell->size)
@@ -38,7 +39,7 @@ int nvmem_cell_read(struct nvmem_cell *cell, void *buf, size_t size)
 	}
 }
 
-int nvmem_cell_write(struct nvmem_cell *cell, const void *buf, size_t size)
+static int nvmem_cell_write_raw(struct nvmem_cell *cell, const void *buf, size_t size)
 {
 	dev_dbg(cell->nvmem, "%s: off=%u size=%zu\n", __func__, cell->offset, size);
 	if (size != cell->size)
@@ -61,6 +62,60 @@ int nvmem_cell_write(struct nvmem_cell *cell, const void *buf, size_t size)
 	default:
 		return -ENOSYS;
 	}
+}
+
+int nvmem_cell_read(struct nvmem_cell *cell, void *buf, size_t size)
+{
+	u8 *data = buf;
+	u64 bit, pos;
+	size_t used;
+	int ret;
+
+	ret = nvmem_cell_read_raw(cell, buf, size);
+	if (ret || !cell->nbits)
+		return ret;
+	for (bit = 0; bit < cell->nbits; bit++) {
+		pos = bit + cell->bit_offset;
+		if (data[pos / 8] & BIT(pos % 8))
+			data[bit / 8] |= BIT(bit % 8);
+		else
+			data[bit / 8] &= ~BIT(bit % 8);
+	}
+	used = DIV_ROUND_UP((u64)cell->nbits, 8);
+	if (cell->nbits % 8)
+		data[used - 1] &= BIT(cell->nbits % 8) - 1;
+	memset(data + used, 0, size - used);
+	return 0;
+}
+
+int nvmem_cell_write(struct nvmem_cell *cell, const void *buf, size_t size)
+{
+	const u8 *data = buf;
+	u8 *raw;
+	u64 bit, pos;
+	int ret;
+
+	if (size != cell->size)
+		return -EINVAL;
+	if (!cell->nbits)
+		return nvmem_cell_write_raw(cell, buf, size);
+	raw = malloc(size);
+	if (!raw)
+		return -ENOMEM;
+	ret = nvmem_cell_read_raw(cell, raw, size);
+	if (ret)
+		goto out;
+	for (bit = 0; bit < cell->nbits; bit++) {
+		pos = bit + cell->bit_offset;
+		if (data[bit / 8] & BIT(bit % 8))
+			raw[pos / 8] |= BIT(pos % 8);
+		else
+			raw[pos / 8] &= ~BIT(pos % 8);
+	}
+	ret = nvmem_cell_write_raw(cell, raw, size);
+out:
+	free(raw);
+	return ret;
 }
 
 /**
@@ -102,6 +157,9 @@ int nvmem_cell_get_by_index(struct udevice *dev, int index,
 	fdt_size_t size = FDT_SIZE_T_NONE;
 	int ret;
 	struct ofnode_phandle_args args;
+	const fdt32_t *bits;
+	u64 bytes;
+	int len;
 	ofnode par;
 
 	dev_dbg(dev, "%s: index=%d\n", __func__, index);
@@ -128,6 +186,19 @@ int nvmem_cell_get_by_index(struct udevice *dev, int index,
 
 	cell->offset = offset;
 	cell->size = size;
+	cell->bit_offset = 0;
+	cell->nbits = 0;
+	if (ofnode_has_property(args.node, "bits")) {
+		bits = ofnode_get_property(args.node, "bits", &len);
+		if (!bits || len != 2 * sizeof(*bits))
+			return -EINVAL;
+		cell->bit_offset = fdt32_to_cpu(bits[0]);
+		cell->nbits = fdt32_to_cpu(bits[1]);
+		bytes = DIV_ROUND_UP((u64)cell->bit_offset + cell->nbits, 8);
+		if (!cell->nbits || bytes > size)
+			return -EINVAL;
+		cell->size = bytes;
+	}
 	return 0;
 }
 

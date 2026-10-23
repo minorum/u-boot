@@ -89,3 +89,33 @@ static int dm_test_reboot_mode_nvmem_byte(struct unit_test_state *uts)
 
 DM_TEST(dm_test_reboot_mode_nvmem_byte,
 	UTF_PROBE_TEST | UTF_SCAN_FDT | UTF_FLAT_TREE);
+
+static int dm_test_reboot_mode_nvmem_bit(struct unit_test_state *uts)
+{
+	struct udevice *rtc, *mode;
+	u8 data[] = { 0xa5, 0, 0x5a };
+	u8 result[sizeof(data)];
+	unsigned int value;
+
+	ut_assertok(uclass_get_device_by_name(UCLASS_RTC, "rtc@43", &rtc));
+	ut_assertok(uclass_get_device_by_name(UCLASS_REBOOT_MODE,
+					      "reboot-mode-nvmem-bit", &mode));
+	for (value = 0; value < 256; value++) {
+		data[1] = value;
+		ut_assertok(dm_rtc_write(rtc, REG_AUX1, data, sizeof(data)));
+		ut_assertok(env_set("bootstatus", NULL));
+		ut_assertok(dm_reboot_mode_update(mode));
+		if (value & BIT(5))
+			ut_asserteq_str("test", env_get("bootstatus"));
+		else
+			ut_assertnull(env_get("bootstatus"));
+		ut_assertok(dm_rtc_read(rtc, REG_AUX1, result, sizeof(result)));
+		ut_asserteq(0xa5, result[0]);
+		ut_asserteq(value & ~BIT(5), result[1]);
+		ut_asserteq(0x5a, result[2]);
+	}
+	return 0;
+}
+
+DM_TEST(dm_test_reboot_mode_nvmem_bit,
+	UTF_PROBE_TEST | UTF_SCAN_FDT | UTF_FLAT_TREE);

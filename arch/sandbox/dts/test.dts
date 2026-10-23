@@ -222,6 +222,14 @@
 		mode-test = <0x12>;
 	};
 
+	reboot-mode-nvmem-bit {
+		compatible = "nvmem-reboot-mode";
+		nvmem-cells = <&reboot_mode_bit>;
+		nvmem-cell-names = "reboot-mode";
+		u-boot,env-variable = "bootstatus";
+		mode-test = <1>;
+	};
+
 	audio: audio-codec {
 		compatible = "sandbox,audio-codec";
 		#sound-dai-cells = <1>;
@@ -1049,6 +1057,11 @@
 
 			reboot_mode_byte: reboot-mode@31 {
 				reg = <0x31 1>;
+			};
+
+			reboot_mode_bit: reboot-mode@32 {
+				reg = <0x32 1>;
+				bits = <5 1>;
 			};
 		};
 
