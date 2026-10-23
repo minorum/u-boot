@@ -66,3 +66,26 @@ static int dm_test_reboot_mode_rtc(struct unit_test_state *uts)
 }
 DM_TEST(dm_test_reboot_mode_rtc,
 	UTF_PROBE_TEST | UTF_SCAN_FDT | UTF_FLAT_TREE);
+
+static int dm_test_reboot_mode_nvmem_byte(struct unit_test_state *uts)
+{
+	struct udevice *rtc, *mode;
+	u8 data[] = { 0xa5, 0x12, 0x5a };
+	u8 result[sizeof(data)];
+
+	ut_assertok(uclass_get_device_by_name(UCLASS_RTC, "rtc@43", &rtc));
+	ut_assertok(dm_rtc_write(rtc, REG_AUX0, data, sizeof(data)));
+	ut_assertok(uclass_get_device_by_name(UCLASS_REBOOT_MODE,
+					      "reboot-mode-nvmem", &mode));
+	ut_assertok(env_set("bootstatus", NULL));
+	ut_assertok(dm_reboot_mode_update(mode));
+	ut_asserteq_str("test", env_get("bootstatus"));
+	ut_assertok(dm_rtc_read(rtc, REG_AUX0, result, sizeof(result)));
+	ut_asserteq(0xa5, result[0]);
+	ut_asserteq(0, result[1]);
+	ut_asserteq(0x5a, result[2]);
+	return 0;
+}
+
+DM_TEST(dm_test_reboot_mode_nvmem_byte,
+	UTF_PROBE_TEST | UTF_SCAN_FDT | UTF_FLAT_TREE);

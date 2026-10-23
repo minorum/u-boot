@@ -214,6 +214,14 @@
 		mode-download = <0x51939147>;
 	};
 
+	reboot-mode-nvmem {
+		compatible = "nvmem-reboot-mode";
+		nvmem-cells = <&reboot_mode_byte>;
+		nvmem-cell-names = "reboot-mode";
+		u-boot,env-variable = "bootstatus";
+		mode-test = <0x12>;
+	};
+
 	audio: audio-codec {
 		compatible = "sandbox,audio-codec";
 		#sound-dai-cells = <1>;
@@ -1037,6 +1045,10 @@
 
 			eth4_addr: mac-address@40 {
 				reg = <0x40 6>;
+			};
+
+			reboot_mode_byte: reboot-mode@31 {
+				reg = <0x31 1>;
 			};
 		};
 

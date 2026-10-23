@@ -18,15 +18,21 @@ struct nvmem_reboot_mode_priv {
 static int reboot_mode_get(struct udevice *dev, u32 *mode)
 {
 	struct nvmem_reboot_mode_priv *priv = dev_get_priv(dev);
+	u32 value = 0;
+	int ret;
 
-	return nvmem_cell_read(&priv->cell, mode, sizeof(*mode));
+	ret = nvmem_cell_read(&priv->cell, &value, priv->cell.size);
+	if (ret)
+		return ret;
+	*mode = value;
+	return 0;
 }
 
 static int reboot_mode_set(struct udevice *dev, u32 mode)
 {
 	struct nvmem_reboot_mode_priv *priv = dev_get_priv(dev);
 
-	return nvmem_cell_write(&priv->cell, &mode, sizeof(mode));
+	return nvmem_cell_write(&priv->cell, &mode, priv->cell.size);
 }
 
 static const struct reboot_mode_ops nvmem_reboot_mode_ops = {
@@ -37,8 +43,14 @@ static const struct reboot_mode_ops nvmem_reboot_mode_ops = {
 static int reboot_mode_probe(struct udevice *dev)
 {
 	struct nvmem_reboot_mode_priv *priv = dev_get_priv(dev);
+	int ret;
 
-	return nvmem_cell_get_by_name(dev, "reboot-mode", &priv->cell);
+	ret = nvmem_cell_get_by_name(dev, "reboot-mode", &priv->cell);
+	if (ret)
+		return ret;
+	if (!priv->cell.size || priv->cell.size > sizeof(u32))
+		return -EINVAL;
+	return 0;
 }
 
 static const struct udevice_id nvmem_reboot_mode_ids[] = {
