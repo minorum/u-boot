@@ -342,4 +342,13 @@ config RTC_HT1380
 	  day of the week, date, month and year information. It is to be
 	  connected via 3 GPIO pins which work as reset, clock, and data.
 
+config RTC_MT6359
+	bool "MediaTek MT6359 RTC backup storage"
+	depends on DM_RTC && DM_PMIC
+	help
+	  Enable access to the two backup bytes in the MT6359 RTC PDN1
+	  register through the parent PMIC. Calendar and alarm operations
+	  are not supported.
+	  The byte interface supports NVMEM cells for reboot-mode consumers.
+
 endmenu
