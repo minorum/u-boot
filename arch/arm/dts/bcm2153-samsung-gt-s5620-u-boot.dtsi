@@ -20,6 +20,10 @@
 		sd1_command: sd1-command-pins {
 			pinctrl-single,bits = <0x20 0x38000000 0x38000000>;
 		};
+
+		sd1_detect: sd1-detect-pins {
+			pinctrl-single,bits = <0x00 0x00001000 0x00001000>;
+		};
 	};
 
 	stock-lcd@8030000 {
@@ -49,6 +53,6 @@
 &sd1 {
 	broken-cd;
 	pinctrl-names = "powered";
-	pinctrl-0 = <&sd1_clear &sd1_data &sd1_command>;
+	pinctrl-0 = <&sd1_clear &sd1_data &sd1_command &sd1_detect>;
 	status = "okay";
 };
