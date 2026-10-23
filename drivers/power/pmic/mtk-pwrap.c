@@ -41,6 +41,7 @@ static const struct pmic_child_info mt6359_pmic_children_info[] = {
 #define PWRAP_GET_WACS_ARB_FSM		GENMASK(3, 1)
 #define PWRAP_STATE_SYNC_IDLE0		BIT(20)
 #define PWRAP_STATE_INIT_DONE0		BIT(21)
+#define PWRAP_STATE_INIT_DONE0_MT8186	BIT(22)
 #define PWRAP_STATE_INIT_DONE1		BIT(15)
 
 /* macro for WACS FSM */
@@ -70,6 +71,7 @@ static const struct pmic_child_info mt6359_pmic_children_info[] = {
 #define PWRAP_CAP_ARB			BIT(6)
 /* To implement this capability, the registers used in pwrap_init() must be defined. */
 #define PWRAP_CAP_INIT			BIT(7)
+#define PWRAP_CAP_ARB_MT8186		BIT(8)
 
 /* defines for slave device wrapper registers */
 enum dew_regs {
@@ -282,6 +284,14 @@ enum pwrap_regs {
 	PWRAP_INT1_FLG,
 	PWRAP_INT1_CLR,
 	PWRAP_WDT_SRC_EN_1,
+};
+
+static int mt6785_regs[] = {
+	[PWRAP_INIT_DONE2] =		0xa0,
+	[PWRAP_TIMER_EN] =		0xf0,
+	[PWRAP_WACS2_CMD] =		0xc20,
+	[PWRAP_WACS2_RDATA] =		0xc24,
+	[PWRAP_WACS2_VLDCLR] =		0xc28,
 };
 
 static int mt8195_regs[] = {
@@ -775,6 +785,8 @@ static int mtk_pwrap_probe(struct udevice *dev)
 
 	if (HAS_CAP(wrp->master->caps, PWRAP_CAP_ARB))
 		mask_done = PWRAP_STATE_INIT_DONE1;
+	else if (HAS_CAP(wrp->master->caps, PWRAP_CAP_ARB_MT8186))
+		mask_done = PWRAP_STATE_INIT_DONE0_MT8186;
 	else
 		mask_done = PWRAP_STATE_INIT_DONE0;
 
@@ -868,6 +880,11 @@ static struct dm_pmic_ops mtk_pwrap_ops = {
 	.write = mtk_pwrap_write,
 };
 
+static const struct pmic_wrapper_type pwrap_mt6785 = {
+	.regs = mt6785_regs,
+	.caps = PWRAP_CAP_ARB_MT8186,
+};
+
 static const struct pmic_wrapper_type pwrap_mt8195 = {
 	.regs = mt8195_regs,
 	.arb_en_all = 0x777f, /* NEED CONFIRM */
@@ -885,6 +902,7 @@ static const struct pmic_wrapper_type pwrap_mt8365 = {
 };
 
 static const struct udevice_id mtk_pwrap_ids[] = {
+	{ .compatible = "mediatek,mt6785-pwrap", .data = (ulong)&pwrap_mt6785 },
 	{ .compatible = "mediatek,mt8195-pwrap", .data = (ulong)&pwrap_mt8195 },
 	{ .compatible = "mediatek,mt8365-pwrap", .data = (ulong)&pwrap_mt8365 },
 	{ }
