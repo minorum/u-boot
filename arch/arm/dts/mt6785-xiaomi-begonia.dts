@@ -16,6 +16,16 @@
 	};
 };
 
+&pwrap {
+	pmic {
+		compatible = "mediatek,mt6359";
+
+		regulators {
+			compatible = "mediatek,mt6359-regulator";
+		};
+	};
+};
+
 &uart0 {
 	status = "okay";
 };
