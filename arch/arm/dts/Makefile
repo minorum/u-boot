@@ -1067,6 +1067,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
 	mt7986b-emmc-rfb.dtb \
 	mt7988-rfb.dtb \
 	mt7988-sd-rfb.dtb \
+	mt6785-xiaomi-begonia.dtb \
 	mt8183-pumpkin.dtb \
 	mt8371-genio-520-evk.dtb \
 	mt8371-genio-520-evk-ufs.dtb \

@@ -3,11 +3,28 @@ if ARCH_MEDIATEK
 config SYS_SOC
 	default "mediatek"
 
+config LNX_KRNL_IMG_TEXT_OFFSET_BASE
+	default 0x40000000 if TARGET_MT6785
+
 config SYS_VENDOR
+	default "xiaomi" if TARGET_MT6785
 	default "mediatek"
 
 choice
 	prompt "MediaTek board select"
+	default TARGET_MT7622
+
+config TARGET_MT6785
+	bool "Xiaomi Redmi Note 8 Pro (MT6785)"
+	select ARM64
+	select LINUX_KERNEL_IMAGE_HEADER
+	select LMB_ARCH_MEM_MAP
+	select SAVE_PREV_BL_FDT_ADDR
+	help
+	  Chain-load U-Boot through the stock bootloader on Xiaomi Begonia.
+	  DRAM and secure firmware remain initialized by the prior stages.
+	  Memory geometry and reservations come from their Linux device tree.
+	  This target does not replace the preloader or initialize DRAM.
 
 config TARGET_MT7622
 	bool "MediaTek MT7622 SoC"
@@ -158,6 +175,7 @@ config MTK_MEM_MAP_DDR_BASE_PHY
 
 config MTK_MEM_MAP_DDR_SIZE
 	hex "DDR .size in mem_map"
+	default 0x200000000 if TARGET_MT6785
 	default 0x200000000 if TARGET_MT7987 || TARGET_MT7988 || TARGET_MT8188 || TARGET_MT8195
 	default 0xc0000000 if TARGET_MT8365
 	default 0x80000000 if TARGET_MT7981 || TARGET_MT7986 || TARGET_MT8183
@@ -177,6 +195,7 @@ endif
 
 config SYS_BOARD
 	string "Board name"
+	default "begonia" if TARGET_MT6785
 	default "mt7622" if TARGET_MT7622
 	default "mt7623" if TARGET_MT7623
 	default "mt7629" if TARGET_MT7629
@@ -195,6 +214,7 @@ config SYS_BOARD
 	  be used.
 
 config SYS_CONFIG_NAME
+	default "xiaomi_begonia" if TARGET_MT6785
 	default "mt7623" if TARGET_MT7623
 	default "mt7629" if TARGET_MT7629
 	default "mt7981" if TARGET_MT7981

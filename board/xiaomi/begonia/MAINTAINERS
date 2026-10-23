@@ -1,0 +1,7 @@
+XIAOMI REDMI NOTE 8 PRO
+M:	minorum <mit.mis@gmail.com>
+S:	Maintained
+F:	arch/arm/dts/mt6785*.dts*
+F:	board/xiaomi/begonia/
+F:	configs/xiaomi_begonia_defconfig
+F:	include/configs/xiaomi_begonia.h
