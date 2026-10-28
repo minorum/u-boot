@@ -451,6 +451,10 @@ static void acm_disable(struct usb_function *f)
 {
 	struct f_acm *f_acm = func_to_acm(f);
 
+	f_acm->connected = false;
+	f_acm->handshake_bits = 0;
+	f_acm->tx_on = false;
+
 	usb_ep_disable(f_acm->ep_out);
 	usb_ep_disable(f_acm->ep_in);
 	usb_ep_disable(f_acm->ep_notify);

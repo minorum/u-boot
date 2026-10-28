@@ -9,6 +9,15 @@ config SYS_VENDOR
 choice
 	prompt "MediaTek board select"
 
+config TARGET_MT6577
+	bool "MediaTek MT6577 RAM bring-up"
+	select CPU_V7A
+	help
+	  RAM-only MODECOM FreeTAB 8001 support.
+	  Requires a preceding download agent to initialize DRAM and USB.
+	  Uses a bounded 16 MiB DRAM window for console qualification.
+	  Does not support starting directly from reset.
+
 config TARGET_MT7622
 	bool "MediaTek MT7622 SoC"
 	select ARM64
@@ -177,6 +186,7 @@ endif
 
 config SYS_BOARD
 	string "Board name"
+	default "modecom_freetab8001" if TARGET_MT6577
 	default "mt7622" if TARGET_MT7622
 	default "mt7623" if TARGET_MT7623
 	default "mt7629" if TARGET_MT7629
@@ -195,6 +205,7 @@ config SYS_BOARD
 	  be used.
 
 config SYS_CONFIG_NAME
+	default "modecom_freetab8001" if TARGET_MT6577
 	default "mt7623" if TARGET_MT7623
 	default "mt7629" if TARGET_MT7629
 	default "mt7981" if TARGET_MT7981

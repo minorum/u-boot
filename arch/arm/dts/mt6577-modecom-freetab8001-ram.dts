@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/dts-v1/;
+
+/ {
+	model = "MODECOM FreeTAB 8001 RAM bring-up";
+	compatible = "modecom,freetab8001", "mediatek,mt6577";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	memory@10000000 {
+		device_type = "memory";
+		reg = <0x10000000 0x01000000>;
+	};
+
+	clk13m: clock-13m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <13000000>;
+		bootph-all;
+	};
+
+	timer@c1002000 {
+		compatible = "mediatek,mt6577-timer";
+		reg = <0xc1002000 0x100>;
+		clocks = <&clk13m>;
+		bootph-all;
+	};
+
+	usb@c1210000 {
+		compatible = "mediatek,mt6577-musb-ram";
+		reg = <0xc1210000 0x1000>;
+		dr_mode = "peripheral";
+	};
+};
