@@ -299,6 +299,7 @@ struct msdc_top_regs {
 
 struct msdc_compatible {
 	u8 clk_div_bits;
+	bool preinitialized;
 	bool pad_tune0;
 	bool async_fifo;
 	bool async_fifo_crcsts;
@@ -640,9 +641,14 @@ static int msdc_pio_read(struct msdc_host *host, u8 *ptr, u32 size)
 {
 	u32 status;
 	u32 chksz;
+	ulong start = host->dev_comp->preinitialized ? get_timer(0) : 0;
 	int ret = 0;
 
 	while (1) {
+		if (host->dev_comp->preinitialized && get_timer(start) > 5000) {
+			ret = -ETIMEDOUT;
+			break;
+		}
 		status = readl(&host->base->msdc_int);
 		writel(status, &host->base->msdc_int);
 		status &= DATA_INTS_MASK;
@@ -889,6 +895,8 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
 
 	host->timeout_ns = ns;
 	host->timeout_clks = clks;
+	if (host->dev_comp->preinitialized)
+		shift = 16;
 
 	if (host->sclk == 0) {
 		timeout = 0;
@@ -947,9 +955,9 @@ static void msdc_set_mclk(struct udevice *dev,
 		return;
 	}
 
-	if (host->dev_comp->clk_div_bits == 8)
+	if (!host->dev_comp->preinitialized && host->dev_comp->clk_div_bits == 8)
 		clrbits_le32(&host->base->msdc_cfg, MSDC_CFG_HS400_CK_MODE);
-	else
+	else if (!host->dev_comp->preinitialized)
 		clrbits_le32(&host->base->msdc_cfg,
 			     MSDC_CFG_HS400_CK_MODE_EXT);
 
@@ -1566,6 +1574,18 @@ static void msdc_init_hw(struct msdc_host *host)
 
 	/* Reset */
 	msdc_reset_hw(host);
+	if (host->dev_comp->preinitialized) {
+		msdc_fifo_clr(host);
+		val = readl(&host->base->msdc_int);
+		writel(val, &host->base->msdc_int);
+		writel(DATA_INTS_MASK | CMD_INTS_MASK, &host->base->msdc_inten);
+		clrsetbits_le32(&host->base->sdc_cfg,
+				SDC_CFG_SDIOIDE | SDC_CFG_DTOC,
+				SDC_CFG_SDIO | FIELD_PREP(SDC_CFG_DTOC, 3));
+		host->def_tune_para.iocon = readl(&host->base->msdc_iocon);
+		host->def_tune_para.pad_tune = readl(tune_reg);
+		return;
+	}
 
 	/* Enable/disable hw card detection according to fdt option */
 	if (host->builtin_cd)
@@ -1724,7 +1744,8 @@ static void msdc_init_hw(struct msdc_host *host)
 static void msdc_ungate_clock(struct msdc_host *host)
 {
 	clk_enable(&host->src_clk);
-	clk_enable(&host->h_clk);
+	if (host->h_clk.dev)
+		clk_enable(&host->h_clk);
 	if (host->src_clk_cg.dev)
 		clk_enable(&host->src_clk_cg);
 
@@ -1743,7 +1764,9 @@ static int msdc_drv_probe(struct udevice *dev)
 
 	cfg->name = dev->name;
 
-	host->dev_comp = (struct msdc_compatible *)dev_get_driver_data(dev);
+	if (host->dev_comp->preinitialized &&
+	    !(readl(&host->base->msdc_cfg) & MSDC_CFG_MODE))
+		return -EIO;
 
 	if (host->dev_comp->use_internal_cd)
 		host->builtin_cd = 1;
@@ -1788,6 +1811,8 @@ static int msdc_of_to_plat(struct udevice *dev)
 	fdt_addr_t base, top_base;
 	int ret;
 
+	host->dev_comp = (struct msdc_compatible *)dev_get_driver_data(dev);
+
 	base = dev_read_addr(dev);
 	if (base == FDT_ADDR_T_NONE)
 		return -EINVAL;
@@ -1808,7 +1833,7 @@ static int msdc_of_to_plat(struct udevice *dev)
 		return ret;
 
 	ret = clk_get_by_name(dev, "hclk", &host->h_clk);
-	if (ret < 0)
+	if (ret < 0 && !host->dev_comp->preinitialized)
 		return ret;
 
 	clk_get_by_name(dev, "source_cg", &host->src_clk_cg); /* optional */
@@ -1874,6 +1899,11 @@ static const struct dm_mmc_ops msdc_ops = {
 	.execute_tuning = msdc_execute_tuning,
 #endif
 	.wait_dat0 = msdc_ops_wait_dat0,
+};
+
+static const struct msdc_compatible mt6577_ram_compat = {
+	.clk_div_bits = 8,
+	.preinitialized = true,
 };
 
 static const struct msdc_compatible mt7620_compat = {
@@ -1992,6 +2022,7 @@ static const struct msdc_compatible mt8189_compat = {
 };
 
 static const struct udevice_id msdc_ids[] = {
+	{ .compatible = "mediatek,mt6577-mmc-ram", .data = (ulong)&mt6577_ram_compat },
 	{ .compatible = "mediatek,mt7620-mmc", .data = (ulong)&mt7620_compat },
 	{ .compatible = "mediatek,mt7621-mmc", .data = (ulong)&mt7621_compat },
 	{ .compatible = "mediatek,mt7622-mmc", .data = (ulong)&mt7622_compat },

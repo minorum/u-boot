@@ -19,6 +19,22 @@
 		bootph-all;
 	};
 
+	msdc_clock: clock-msdc {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <197000000>;
+	};
+
+	mmc@c1220000 {
+		compatible = "mediatek,mt6577-mmc-ram";
+		reg = <0xc1220000 0x1000>;
+		clocks = <&msdc_clock>;
+		clock-names = "source";
+		bus-width = <4>;
+		max-frequency = <12000000>;
+		non-removable;
+	};
+
 	timer@c1002000 {
 		compatible = "mediatek,mt6577-timer";
 		reg = <0xc1002000 0x100>;
