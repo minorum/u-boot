@@ -20,7 +20,7 @@ int board_early_init_f(void)
 
 int dram_init(void)
 {
-	gd->ram_size = SZ_16M;
+	gd->ram_size = SZ_64M;
 	return 0;
 }
 

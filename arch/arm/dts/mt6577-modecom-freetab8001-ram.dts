@@ -9,7 +9,7 @@
 
 	memory@10000000 {
 		device_type = "memory";
-		reg = <0x10000000 0x01000000>;
+		reg = <0x10000000 0x04000000>;
 	};
 
 	clk13m: clock-13m {
