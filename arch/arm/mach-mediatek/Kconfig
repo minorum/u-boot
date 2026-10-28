@@ -15,7 +15,7 @@ config TARGET_MT6577
 	help
 	  RAM-only MODECOM FreeTAB 8001 support.
 	  Requires a preceding download agent to initialize DRAM and USB.
-	  Uses a bounded 16 MiB DRAM window for console qualification.
+	  Uses a bounded 64 MiB DRAM window for console qualification.
 	  Does not support starting directly from reset.
 
 config TARGET_MT7622

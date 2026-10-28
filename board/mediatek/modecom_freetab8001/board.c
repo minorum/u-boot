@@ -2,6 +2,7 @@
 #include <config.h>
 #include <cpu_func.h>
 #include <errno.h>
+#include <efi_loader.h>
 #include <fdt_support.h>
 #include <init.h>
 #include <asm/global_data.h>
@@ -50,3 +51,24 @@ void reset_cpu(void)
 	for (;;)
 		;
 }
+
+#ifdef CONFIG_EFI_LOADER
+static void __iomem *efi_wdt_base __efi_runtime_data;
+
+void __efi_runtime EFIAPI efi_reset_system(enum efi_reset_type reset_type,
+					   efi_status_t reset_status,
+					   unsigned long data_size, void *reset_data)
+{
+	if (reset_type == EFI_RESET_COLD || reset_type == EFI_RESET_WARM ||
+	    reset_type == EFI_RESET_PLATFORM_SPECIFIC)
+		writew(0x1209, efi_wdt_base + 0x14);
+	for (;;)
+		;
+}
+
+efi_status_t efi_reset_system_init(void)
+{
+	efi_wdt_base = (void *)0xc0000000;
+	return efi_add_runtime_mmio(&efi_wdt_base, SZ_4K);
+}
+#endif

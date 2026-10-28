@@ -105,7 +105,7 @@ config EFI_HAVE_RUNTIME_RESET
 	bool "Reset runtime service"
 	default y
 	depends on ARCH_BCM283X || FSL_LAYERSCAPE || PSCI_RESET || \
-		   SANDBOX || SYSRESET_SBI || SYSRESET_X86
+		   SANDBOX || SYSRESET_SBI || SYSRESET_X86 || TARGET_MT6577
 
 endmenu
 
