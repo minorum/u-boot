@@ -2,6 +2,7 @@
 #include <dm.h>
 #include <linux/delay.h>
 #include "musb_uboot.h"
+#include "mt6577_phy.h"
 
 #define MT6577_SWRST 0x74
 #define MT6577_L1INTM 0xa4
@@ -9,6 +10,7 @@
 struct mt6577_glue {
 	struct device dev;
 	struct musb *musb;
+	void __iomem *phy;
 };
 
 static volatile u32 mt6577_reset_trace[6];
@@ -58,11 +60,14 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 
 static int mt6577_init(struct musb *musb)
 {
+	struct mt6577_glue *glue = container_of(musb->controller,
+					     struct mt6577_glue, dev);
 	void __iomem *base = musb->mregs;
 
-	/* shortcut: DA owns PHY calibration, replace for cold boot */
+	/* shortcut: inherited clocks/calibration, qualify cold init separately */
 	musb_writeb(base, MUSB_POWER, 0);
 	mdelay(20);
+	mt6577_phy_recover(glue->phy);
 	musb_writew(base, MT6577_SWRST,
 		    musb_readw(base, MT6577_SWRST) | 3);
 	musb_writel(base, MT6577_L1INTM, 7);
@@ -98,10 +103,12 @@ static int mt6577_probe(struct udevice *dev)
 		.platform_ops = &mt6577_ops,
 	};
 	void *base = dev_read_addr_ptr(dev);
+	void *phy = dev_read_addr_index_ptr(dev, 1);
 	int ret;
 
-	if (!base)
+	if (!base || !phy)
 		return -EINVAL;
+	glue->phy = phy;
 	glue->musb = musb_init_controller(&pdata, &glue->dev, base);
 	if (!glue->musb)
 		return -EIO;

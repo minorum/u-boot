@@ -44,7 +44,7 @@
 
 	usb@c1210000 {
 		compatible = "mediatek,mt6577-musb-ram";
-		reg = <0xc1210000 0x1000>;
+		reg = <0xc1210000 0x1000>, <0xc1260800 0x100>;
 		dr_mode = "peripheral";
 	};
 };
