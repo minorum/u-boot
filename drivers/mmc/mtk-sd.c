@@ -1576,6 +1576,15 @@ static int mt6577_init_hw(struct msdc_host *host)
 	if (ret)
 		return ret;
 
+	writel(MSDC_PAD_CTRL0_CLKPD | MSDC_PAD_CTRL0_CLKSMT |
+	       MSDC_PAD_CTRL0_CLKIES | FIELD_PREP(MSDC_PAD_CTRL0_CLKDRVN, 4) |
+	       FIELD_PREP(MSDC_PAD_CTRL0_CLKDRVP, 4), &host->base->pad_ctrl0);
+	writel(MSDC_PAD_CTRL1_CMDPU | MSDC_PAD_CTRL1_CMDSMT |
+	       MSDC_PAD_CTRL1_CMDIES | FIELD_PREP(MSDC_PAD_CTRL1_CMDDRVN, 4) |
+	       FIELD_PREP(MSDC_PAD_CTRL1_CMDDRVP, 4), &host->base->pad_ctrl1);
+	writel(MSDC_PAD_CTRL2_DATPU | MSDC_PAD_CTRL2_DATSMT |
+	       MSDC_PAD_CTRL2_DATIES | FIELD_PREP(MSDC_PAD_CTRL2_DATDRVN, 4) |
+	       FIELD_PREP(MSDC_PAD_CTRL2_DATDRVP, 4), &host->base->pad_ctrl2);
 	clrbits_le32(&host->base->msdc_ps, MSDC_PS_CDEN);
 	val = readl(&host->base->msdc_int);
 	writel(val, &host->base->msdc_int);
