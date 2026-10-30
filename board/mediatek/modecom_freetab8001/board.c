@@ -79,14 +79,17 @@ int board_init(void)
 int board_fix_fdt(void *blob)
 {
 	static const u32 rates[] = {197000001, 197000000, 192000000};
-	u32 source = readl((void *)0xc100000c) & 3;
+	u32 source;
 	int node;
 
-	if (source >= ARRAY_SIZE(rates))
-		return -EINVAL;
 	node = fdt_path_offset(blob, "/clock-msdc");
+	if (node == -FDT_ERR_NOTFOUND)
+		return 0;
 	if (node < 0)
 		return node;
+	source = readl((void *)0xc100000c) & 3;
+	if (source >= ARRAY_SIZE(rates))
+		return -EINVAL;
 	return fdt_setprop_u32(blob, node, "clock-frequency", rates[source]);
 }
 
