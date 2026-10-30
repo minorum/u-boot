@@ -227,4 +227,5 @@ U_BOOT_DRIVER(mt6577_musb) = {
 	.remove = mt6577_remove,
 	.ops = &mt6577_gadget_ops,
 	.priv_auto = sizeof(struct mt6577_glue),
+	.flags = DM_FLAG_OS_PREPARE,
 };

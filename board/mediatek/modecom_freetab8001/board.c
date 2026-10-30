@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include <config.h>
+#include <bootm.h>
+#include <console.h>
 #include <cpu_func.h>
+#include <dm.h>
+#include <dm/device-internal.h>
+#include <dm/uclass-internal.h>
 #include <errno.h>
 #include <efi_loader.h>
 #include <fdt_support.h>
 #include <init.h>
+#include <stdio_dev.h>
+#include <vsprintf.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/sections.h>
@@ -74,6 +81,30 @@ int board_init(void)
 {
 	gd->bd->bi_boot_params = gd->ram_base + 0x100;
 	return 0;
+}
+
+void board_quiesce_devices(void)
+{
+	struct stdio_dev *acm = stdio_get_by_name("usbacm");
+	struct udevice *udc;
+	int file, ret;
+
+	if (acm) {
+		for (file = 0; file < MAX_FILES; file++) {
+			if (stdio_devices[file] == acm && console_assign(file, "nulldev"))
+				panic("USB console redirection failed");
+		}
+		if (acm->priv && (!acm->stop || acm->stop(acm)))
+			panic("USB console shutdown failed");
+	}
+	ret = uclass_find_first_device(UCLASS_USB_GADGET_GENERIC, &udc);
+	if (ret)
+		panic("USB controller lookup failed: %d", ret);
+	if (udc && device_active(udc)) {
+		ret = device_remove(udc, DM_REMOVE_NORMAL);
+		if (ret)
+			panic("USB resource shutdown failed: %d", ret);
+	}
 }
 
 int board_fix_fdt(void *blob)
