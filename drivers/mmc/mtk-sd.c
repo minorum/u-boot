@@ -300,6 +300,7 @@ struct msdc_top_regs {
 struct msdc_compatible {
 	u8 clk_div_bits;
 	bool preinitialized;
+	bool mt6577;
 	bool pad_tune0;
 	bool async_fifo;
 	bool async_fifo_crcsts;
@@ -643,11 +644,11 @@ static int msdc_pio_read(struct msdc_host *host, u8 *ptr, u32 size)
 {
 	u32 status;
 	u32 chksz;
-	ulong start = host->dev_comp->preinitialized ? get_timer(0) : 0;
+	ulong start = host->dev_comp->mt6577 ? get_timer(0) : 0;
 	int ret = 0;
 
 	while (1) {
-		if (host->dev_comp->preinitialized && get_timer(start) > 5000) {
+		if (host->dev_comp->mt6577 && get_timer(start) > 5000) {
 			ret = -ETIMEDOUT;
 			break;
 		}
@@ -897,7 +898,7 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
 
 	host->timeout_ns = ns;
 	host->timeout_clks = clks;
-	if (host->dev_comp->preinitialized)
+	if (host->dev_comp->mt6577)
 		shift = 16;
 
 	if (host->sclk == 0) {
@@ -957,9 +958,9 @@ static void msdc_set_mclk(struct udevice *dev,
 		return;
 	}
 
-	if (!host->dev_comp->preinitialized && host->dev_comp->clk_div_bits == 8)
+	if (!host->dev_comp->mt6577 && host->dev_comp->clk_div_bits == 8)
 		clrbits_le32(&host->base->msdc_cfg, MSDC_CFG_HS400_CK_MODE);
-	else if (!host->dev_comp->preinitialized)
+	else if (!host->dev_comp->mt6577)
 		clrbits_le32(&host->base->msdc_cfg,
 			     MSDC_CFG_HS400_CK_MODE_EXT);
 
@@ -1882,7 +1883,7 @@ static int msdc_of_to_plat(struct udevice *dev)
 		return ret;
 
 	ret = clk_get_by_name(dev, "hclk", &host->h_clk);
-	if (ret < 0 && !host->dev_comp->preinitialized)
+	if (ret < 0 && !host->dev_comp->mt6577)
 		return ret;
 
 	clk_get_by_name(dev, "source_cg", &host->src_clk_cg); /* optional */
@@ -1953,6 +1954,7 @@ static const struct dm_mmc_ops msdc_ops = {
 static const struct msdc_compatible mt6577_ram_compat = {
 	.clk_div_bits = 8,
 	.preinitialized = true,
+	.mt6577 = true,
 };
 
 static const struct msdc_compatible mt7620_compat = {
