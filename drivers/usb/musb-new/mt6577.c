@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include <dm.h>
+#include <clk.h>
+#include <generic-phy.h>
 #include <linux/delay.h>
 #include "musb_uboot.h"
-#include "mt6577_phy.h"
 
 #define MT6577_SWRST 0x74
 #define MT6577_L1INTM 0xa4
@@ -10,10 +11,66 @@
 struct mt6577_glue {
 	struct device dev;
 	struct musb *musb;
-	void __iomem *phy;
+	struct clk *bus;
+	struct phy phy;
+	bool bus_on;
+	bool initialized;
+	bool powered;
 };
 
 static volatile u32 mt6577_reset_trace[6];
+
+static int mt6577_resources_off(struct mt6577_glue *glue)
+{
+	int ret;
+
+	if (glue->powered) {
+		ret = generic_phy_power_off(&glue->phy);
+		if (ret)
+			return ret;
+		glue->powered = false;
+	}
+	if (glue->initialized) {
+		ret = generic_phy_exit(&glue->phy);
+		if (ret)
+			return ret;
+		glue->initialized = false;
+	}
+	if (glue->bus_on) {
+		ret = clk_disable(glue->bus);
+		if (ret)
+			return ret;
+		glue->bus_on = false;
+	}
+	return 0;
+}
+
+static int mt6577_resources_on(struct mt6577_glue *glue)
+{
+	int ret, cleanup;
+
+	if (clk_get_rate(glue->bus) != 61000000)
+		return -EINVAL;
+	ret = generic_phy_set_mode(&glue->phy, PHY_MODE_USB_DEVICE, 0);
+	if (ret)
+		return ret;
+	ret = clk_enable(glue->bus);
+	if (ret)
+		return ret;
+	glue->bus_on = true;
+	ret = generic_phy_init(&glue->phy);
+	if (ret)
+		goto cleanup;
+	glue->initialized = true;
+	ret = generic_phy_power_on(&glue->phy);
+	if (ret)
+		goto cleanup;
+	glue->powered = true;
+	return 0;
+cleanup:
+	cleanup = mt6577_resources_off(glue);
+	return cleanup ? cleanup : ret;
+}
 
 static irqreturn_t mt6577_interrupt(int irq, void *data)
 {
@@ -60,14 +117,10 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 
 static int mt6577_init(struct musb *musb)
 {
-	struct mt6577_glue *glue = container_of(musb->controller,
-					     struct mt6577_glue, dev);
 	void __iomem *base = musb->mregs;
 
-	/* shortcut: inherited clocks/calibration, qualify cold init separately */
 	musb_writeb(base, MUSB_POWER, 0);
 	mdelay(20);
-	mt6577_phy_recover(glue->phy);
 	musb_writew(base, MT6577_SWRST,
 		    musb_readw(base, MT6577_SWRST) | 3);
 	musb_writel(base, MT6577_L1INTM, 7);
@@ -103,37 +156,56 @@ static int mt6577_probe(struct udevice *dev)
 		.platform_ops = &mt6577_ops,
 	};
 	void *base = dev_read_addr_ptr(dev);
-	void *phy = dev_read_addr_index_ptr(dev, 1);
-	int ret;
+	int ret, cleanup;
 
-	if (!base || !phy)
+	if (!base)
 		return -EINVAL;
-	glue->phy = phy;
+	glue->bus = devm_clk_get(dev, "bus");
+	if (IS_ERR(glue->bus))
+		return PTR_ERR(glue->bus);
+	ret = generic_phy_get_by_name(dev, "usb2-phy", &glue->phy);
+	if (ret)
+		return ret;
+	ret = mt6577_resources_on(glue);
+	if (ret)
+		return ret;
 	glue->musb = musb_init_controller(&pdata, &glue->dev, base);
-	if (!glue->musb)
-		return -EIO;
+	if (!glue->musb) {
+		ret = -EIO;
+		goto disable;
+	}
 	ret = usb_add_gadget_udc(&glue->dev, &glue->musb->g);
 	if (ret) {
 		musb_stop(glue->musb);
 		free(glue->musb);
+		glue->musb = NULL;
+		goto disable;
 	}
-	return ret;
+	return 0;
+disable:
+	cleanup = mt6577_resources_off(glue);
+	return cleanup ? cleanup : ret;
 }
 
 static int mt6577_remove(struct udevice *dev)
 {
 	struct mt6577_glue *glue = dev_get_priv(dev);
 
-	usb_del_gadget_udc(&glue->musb->g);
-	musb_stop(glue->musb);
-	free(glue->musb);
-	return 0;
+	if (glue->musb) {
+		usb_del_gadget_udc(&glue->musb->g);
+		musb_stop(glue->musb);
+		free(glue->musb);
+		glue->musb = NULL;
+	}
+	return mt6577_resources_off(glue);
 }
 
 static int mt6577_handle_interrupts(struct udevice *dev)
 {
 	struct mt6577_glue *glue = dev_get_priv(dev);
 
+	if (!glue->musb)
+		return -ENODEV;
 	mt6577_interrupt(0, glue->musb);
 	return 0;
 }
@@ -143,12 +215,12 @@ static const struct usb_gadget_generic_ops mt6577_gadget_ops = {
 };
 
 static const struct udevice_id mt6577_ids[] = {
-	{ .compatible = "mediatek,mt6577-musb-ram" },
+	{ .compatible = "mediatek,mt6577-musb" },
 	{ }
 };
 
-U_BOOT_DRIVER(mt6577_musb_ram) = {
-	.name = "mt6577-musb-ram",
+U_BOOT_DRIVER(mt6577_musb) = {
+	.name = "mt6577-musb",
 	.id = UCLASS_USB_GADGET_GENERIC,
 	.of_match = mt6577_ids,
 	.probe = mt6577_probe,

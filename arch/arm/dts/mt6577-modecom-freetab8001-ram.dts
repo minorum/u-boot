@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /dts-v1/;
 #include <dt-bindings/clock/mediatek,mt6577-clk.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 
 / {
 	model = "MODECOM FreeTAB 8001 RAM bring-up";
@@ -95,9 +97,42 @@
 		bootph-all;
 	};
 
+	gic: interrupt-controller@c000b000 {
+		compatible = "arm,cortex-a9-gic";
+		reg = <0xc000b000 0x1000>, <0xc000a100 0x100>;
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		#address-cells = <0>;
+	};
+
+	sysirq: interrupt-controller@c0009050 {
+		compatible = "mediatek,mt6577-sysirq";
+		reg = <0xc0009050 0x10>;
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		#address-cells = <0>;
+		interrupt-parent = <&gic>;
+	};
+
+	usb_phy: phy@c1260800 {
+		compatible = "mediatek,mt6577-usb-phy";
+		reg = <0xc1260800 0x800>;
+		clocks = <&apmixedsys CLK_MT6577_UPLL>, <&pericfg CLK_MT6577_USB>;
+		clock-names = "upll", "bus";
+		vusb33-supply = <&vusb>;
+		#phy-cells = <0>;
+	};
+
 	usb@c1210000 {
-		compatible = "mediatek,mt6577-musb-ram";
-		reg = <0xc1210000 0x1000>, <0xc1260800 0x100>;
+		compatible = "mediatek,mt6577-musb";
+		reg = <0xc1210000 0x1000>;
+		interrupt-parent = <&sysirq>;
+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "mc";
+		clocks = <&pericfg CLK_MT6577_USB>;
+		clock-names = "bus";
+		phys = <&usb_phy>;
+		phy-names = "usb2-phy";
 		dr_mode = "peripheral";
 	};
 };
