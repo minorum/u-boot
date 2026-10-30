@@ -2000,7 +2000,7 @@ static const struct dm_mmc_ops msdc_ops = {
 	.wait_dat0 = msdc_ops_wait_dat0,
 };
 
-static const struct msdc_compatible mt6577_ram_compat = {
+static const struct msdc_compatible mt6577_compat = {
 	.clk_div_bits = 8,
 	.mt6577 = true,
 };
@@ -2121,7 +2121,7 @@ static const struct msdc_compatible mt8189_compat = {
 };
 
 static const struct udevice_id msdc_ids[] = {
-	{ .compatible = "mediatek,mt6577-mmc-ram", .data = (ulong)&mt6577_ram_compat },
+	{ .compatible = "mediatek,mt6577-mmc", .data = (ulong)&mt6577_compat },
 	{ .compatible = "mediatek,mt7620-mmc", .data = (ulong)&mt7620_compat },
 	{ .compatible = "mediatek,mt7621-mmc", .data = (ulong)&mt7621_compat },
 	{ .compatible = "mediatek,mt7622-mmc", .data = (ulong)&mt7622_compat },
