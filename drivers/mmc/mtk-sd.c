@@ -42,6 +42,12 @@
 #define MSDC_IOCON_DSPL			BIT(2)
 #define MSDC_IOCON_RSPL			BIT(1)
 
+#define MSDC_IOCON_DDLSEL		BIT(3)
+
+#define MT6577_DAT_RDDLY0		0xf0
+#define MT6577_DAT_RDDLY1		0xf4
+#define MT6577_ECO_VER		0x104
+
 /* MSDC_PS */
 #define MSDC_PS_DAT0			BIT(16)
 #define MSDC_PS_CDDBCE			GENMASK(15, 12)
@@ -299,7 +305,6 @@ struct msdc_top_regs {
 
 struct msdc_compatible {
 	u8 clk_div_bits;
-	bool preinitialized;
 	bool mt6577;
 	bool pad_tune0;
 	bool async_fifo;
@@ -383,23 +388,23 @@ struct msdc_host {
 	struct msdc_tune_para saved_tune_para;
 };
 
-static void msdc_reset_hw(struct msdc_host *host)
+static int msdc_reset_hw(struct msdc_host *host)
 {
 	u32 reg;
 
 	setbits_le32(&host->base->msdc_cfg, MSDC_CFG_RST);
 
-	readl_poll_timeout(&host->base->msdc_cfg, reg,
+	return readl_poll_timeout(&host->base->msdc_cfg, reg,
 			   !(reg & MSDC_CFG_RST), 1000000);
 }
 
-static void msdc_fifo_clr(struct msdc_host *host)
+static int msdc_fifo_clr(struct msdc_host *host)
 {
 	u32 reg;
 
 	setbits_le32(&host->base->msdc_fifocs, MSDC_FIFOCS_CLR);
 
-	readl_poll_timeout(&host->base->msdc_fifocs, reg,
+	return readl_poll_timeout(&host->base->msdc_fifocs, reg,
 			   !(reg & MSDC_FIFOCS_CLR), 1000000);
 }
 
@@ -1553,6 +1558,42 @@ tune_done:
 }
 #endif
 
+static int mt6577_init_hw(struct msdc_host *host)
+{
+	void __iomem *base = host->base;
+	u32 val;
+	int ret;
+
+	if (readl(base + MT6577_ECO_VER) != 4)
+		return -ENODEV;
+
+	clrsetbits_le32(&host->base->msdc_cfg, MSDC_CFG_CKPDN,
+			MSDC_CFG_MODE | MSDC_CFG_PIO);
+	ret = msdc_reset_hw(host);
+	if (ret)
+		return ret;
+	ret = msdc_fifo_clr(host);
+	if (ret)
+		return ret;
+
+	clrbits_le32(&host->base->msdc_ps, MSDC_PS_CDEN);
+	val = readl(&host->base->msdc_int);
+	writel(val, &host->base->msdc_int);
+	writel(DATA_INTS_MASK | CMD_INTS_MASK, &host->base->msdc_inten);
+	writel(0, &host->base->pad_tune);
+	writel(MSDC_IOCON_DDLSEL, &host->base->msdc_iocon);
+	writel(0, base + MT6577_DAT_RDDLY0);
+	writel(0, base + MT6577_DAT_RDDLY1);
+	writel(0x403c004f, &host->base->patch_bit0);
+	clrsetbits_le32(&host->base->sdc_cfg,
+			SDC_CFG_BUSWIDTH | SDC_CFG_SDIOIDE | SDC_CFG_DTOC,
+			SDC_CFG_SDIO | FIELD_PREP(SDC_CFG_DTOC, 3));
+	host->def_tune_para.iocon = readl(&host->base->msdc_iocon);
+	host->def_tune_para.pad_tune = readl(&host->base->pad_tune);
+
+	return 0;
+}
+
 static void msdc_init_hw(struct msdc_host *host)
 {
 	u32 val;
@@ -1577,18 +1618,6 @@ static void msdc_init_hw(struct msdc_host *host)
 
 	/* Reset */
 	msdc_reset_hw(host);
-	if (host->dev_comp->preinitialized) {
-		msdc_fifo_clr(host);
-		val = readl(&host->base->msdc_int);
-		writel(val, &host->base->msdc_int);
-		writel(DATA_INTS_MASK | CMD_INTS_MASK, &host->base->msdc_inten);
-		clrsetbits_le32(&host->base->sdc_cfg,
-				SDC_CFG_SDIOIDE | SDC_CFG_DTOC,
-				SDC_CFG_SDIO | FIELD_PREP(SDC_CFG_DTOC, 3));
-		host->def_tune_para.iocon = readl(&host->base->msdc_iocon);
-		host->def_tune_para.pad_tune = readl(tune_reg);
-		return;
-	}
 
 	/* Enable/disable hw card detection according to fdt option */
 	if (host->builtin_cd)
@@ -1797,12 +1826,6 @@ static int msdc_drv_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	if (host->dev_comp->preinitialized &&
-	    !(readl(&host->base->msdc_cfg) & MSDC_CFG_MODE)) {
-		ret = -EIO;
-		goto disable;
-	}
-
 	if (host->dev_comp->use_internal_cd)
 		host->builtin_cd = 1;
 
@@ -1830,7 +1853,13 @@ static int msdc_drv_probe(struct udevice *dev)
 	pinctrl_select_state(dev, "default");
 #endif
 
-	msdc_init_hw(host);
+	if (host->dev_comp->mt6577) {
+		ret = mt6577_init_hw(host);
+		if (ret)
+			goto disable;
+	} else {
+		msdc_init_hw(host);
+	}
 	host->quiesced = false;
 
 	upriv->mmc = &plat->mmc;
@@ -1953,7 +1982,6 @@ static const struct dm_mmc_ops msdc_ops = {
 
 static const struct msdc_compatible mt6577_ram_compat = {
 	.clk_div_bits = 8,
-	.preinitialized = true,
 	.mt6577 = true,
 };
 
