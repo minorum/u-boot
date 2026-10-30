@@ -12,6 +12,12 @@ config DM_PMIC
 
 if DM_PMIC
 
+config PMIC_MT6329
+	bool "MediaTek MT6329 PMIC"
+	depends on DM_I2C && DM_REGULATOR
+	help
+	  Enable MT6329 identity checks and restricted VUSB register access.
+
 config SPL_DM_PMIC
 	bool "Enable Driver Model for PMIC drivers (UCLASS_PMIC) in SPL"
 	depends on SPL_DM

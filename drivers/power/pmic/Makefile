@@ -4,6 +4,7 @@
 # Lukasz Majewski <l.majewski@samsung.com>
 
 obj-$(CONFIG_$(PHASE_)DM_PMIC) += pmic-uclass.o
+obj-$(CONFIG_PMIC_MT6329) += mt6329.o
 obj-$(CONFIG_$(PHASE_)DM_PMIC_FAN53555) += fan53555.o
 obj-$(CONFIG_$(PHASE_)DM_PMIC_DA9063) += da9063.o
 obj-$(CONFIG_$(PHASE_)DM_PMIC_MAX77663) += max77663.o
