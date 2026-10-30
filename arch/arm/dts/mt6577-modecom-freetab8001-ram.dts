@@ -53,6 +53,17 @@
 		#clock-cells = <1>;
 	};
 
+	i2c@c1014000 {
+		compatible = "mediatek,mt6577-i2c-dual";
+		reg = <0xc1014000 0xc0>;
+		clocks = <&pericfg CLK_MT6577_I2C_DUAL>;
+		clock-names = "main";
+		clock-frequency = <100000>;
+		mediatek,use-push-pull;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+
 	mmc@c1220000 {
 		compatible = "mediatek,mt6577-mmc-ram";
 		reg = <0xc1220000 0x1000>;
