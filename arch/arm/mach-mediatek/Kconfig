@@ -12,6 +12,9 @@ choice
 config TARGET_MT6577
 	bool "MediaTek MT6577 RAM bring-up"
 	select CPU_V7A
+	select CLK
+	select CLK_CCF
+	select CLK_AUTO_ID
 	help
 	  RAM-only MODECOM FreeTAB 8001 support.
 	  Requires a preceding download agent to initialize DRAM and USB.

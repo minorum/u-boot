@@ -346,6 +346,8 @@ struct msdc_host {
 	struct clk ahb_cg_clk;	/* optional, AHB clock */
 
 	u32 src_clk_freq;	/* source clock */
+	u32 clocks_enabled;
+	bool quiesced;
 	u32 mclk;		/* mmc framework required bus clock */
 	u32 sclk;		/* actual calculated bus clock */
 
@@ -1741,18 +1743,38 @@ static void msdc_init_hw(struct msdc_host *host)
 	host->def_tune_para.pad_tune = readl(&host->base->pad_tune);
 }
 
-static void msdc_ungate_clock(struct msdc_host *host)
+static int msdc_set_clocks(struct msdc_host *host, bool enable)
 {
-	clk_enable(&host->src_clk);
-	if (host->h_clk.dev)
-		clk_enable(&host->h_clk);
-	if (host->src_clk_cg.dev)
-		clk_enable(&host->src_clk_cg);
+	struct clk *clocks[] = {
+		&host->src_clk, &host->h_clk, &host->src_clk_cg,
+		&host->axi_cg_clk, &host->ahb_cg_clk,
+	};
+	unsigned int i;
+	int cleanup, ret = 0;
 
-	if (host->axi_cg_clk.dev)
-		clk_enable(&host->axi_cg_clk);
-	if (host->ahb_cg_clk.dev)
-		clk_enable(&host->ahb_cg_clk);
+	if (enable) {
+		for (i = 0; i < ARRAY_SIZE(clocks); i++) {
+			if (!clk_valid(clocks[i]) || (host->clocks_enabled & BIT(i)))
+				continue;
+			ret = clk_enable(clocks[i]);
+			if (ret)
+				goto disable;
+			host->clocks_enabled |= BIT(i);
+		}
+		return 0;
+	}
+	i = ARRAY_SIZE(clocks);
+disable:
+	while (i) {
+		--i;
+		if (!(host->clocks_enabled & BIT(i)))
+			continue;
+		cleanup = clk_disable(clocks[i]);
+		if (cleanup)
+			return cleanup;
+		host->clocks_enabled &= ~BIT(i);
+	}
+	return ret;
 }
 
 static int msdc_drv_probe(struct udevice *dev)
@@ -1761,17 +1783,29 @@ static int msdc_drv_probe(struct udevice *dev)
 	struct msdc_plat *plat = dev_get_plat(dev);
 	struct msdc_host *host = dev_get_priv(dev);
 	struct mmc_config *cfg = &plat->cfg;
+	ulong rate;
+	int ret, cleanup;
 
 	cfg->name = dev->name;
+	rate = clk_get_rate(&host->src_clk);
+	if (IS_ERR_VALUE(rate))
+		return (long)rate;
+	if (!rate || rate > U32_MAX)
+		return -EINVAL;
+	ret = msdc_set_clocks(host, true);
+	if (ret)
+		return ret;
 
 	if (host->dev_comp->preinitialized &&
-	    !(readl(&host->base->msdc_cfg) & MSDC_CFG_MODE))
-		return -EIO;
+	    !(readl(&host->base->msdc_cfg) & MSDC_CFG_MODE)) {
+		ret = -EIO;
+		goto disable;
+	}
 
 	if (host->dev_comp->use_internal_cd)
 		host->builtin_cd = 1;
 
-	host->src_clk_freq = clk_get_rate(&host->src_clk);
+	host->src_clk_freq = rate;
 
 	if (host->dev_comp->clk_div_bits == 8)
 		cfg->f_min = host->src_clk_freq / (4 * 255);
@@ -1795,12 +1829,27 @@ static int msdc_drv_probe(struct udevice *dev)
 	pinctrl_select_state(dev, "default");
 #endif
 
-	msdc_ungate_clock(host);
 	msdc_init_hw(host);
+	host->quiesced = false;
 
 	upriv->mmc = &plat->mmc;
 
 	return 0;
+disable:
+	cleanup = msdc_set_clocks(host, false);
+	return cleanup ? cleanup : ret;
+}
+
+static int msdc_drv_remove(struct udevice *dev)
+{
+	struct msdc_host *host = dev_get_priv(dev);
+
+	if (!host->quiesced) {
+		writel(0, &host->base->msdc_inten);
+		msdc_set_mclk(dev, host, MMC_LEGACY, 0);
+		host->quiesced = true;
+	}
+	return msdc_set_clocks(host, false);
 }
 
 static int msdc_of_to_plat(struct udevice *dev)
@@ -2044,6 +2093,7 @@ U_BOOT_DRIVER(mtk_sd_drv) = {
 	.of_to_plat = msdc_of_to_plat,
 	.bind = msdc_drv_bind,
 	.probe = msdc_drv_probe,
+	.remove = msdc_drv_remove,
 	.ops = &msdc_ops,
 	.plat_auto	= sizeof(struct msdc_plat),
 	.priv_auto	= sizeof(struct msdc_host),

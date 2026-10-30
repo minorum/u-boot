@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /dts-v1/;
+#include <dt-bindings/clock/mediatek,mt6577-clk.h>
 
 / {
 	model = "MODECOM FreeTAB 8001 RAM bring-up";
@@ -19,16 +20,43 @@
 		bootph-all;
 	};
 
-	msdc_clock: clock-msdc {
+	clk26m: clock-26m {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
-		clock-frequency = <197000000>;
+		clock-frequency = <26000000>;
+	};
+
+	apmixedsys: clock-controller@c0007000 {
+		compatible = "mediatek,mt6577-apmixedsys";
+		reg = <0xc0007000 0x1000>;
+		clocks = <&clk26m>;
+		clock-names = "clk26m";
+		#clock-cells = <1>;
+	};
+
+	infracfg: clock-controller@c0001000 {
+		compatible = "mediatek,mt6577-infracfg";
+		reg = <0xc0001000 0x1000>;
+		clocks = <&clk26m>, <&apmixedsys CLK_MT6577_MAINPLL>,
+			 <&apmixedsys CLK_MT6577_WPLL197>;
+		clock-names = "clk26m", "mainpll", "wpll";
+		#clock-cells = <1>;
+	};
+
+	pericfg: clock-controller@c1000000 {
+		compatible = "mediatek,mt6577-pericfg";
+		reg = <0xc1000000 0x1000>;
+		clocks = <&infracfg CLK_MT6577_AXI>, <&clk26m>,
+			 <&apmixedsys CLK_MT6577_WPLL197>,
+			 <&apmixedsys CLK_MT6577_WPLL61>;
+		clock-names = "axi", "clk26m", "wpll197", "wpll61";
+		#clock-cells = <1>;
 	};
 
 	mmc@c1220000 {
 		compatible = "mediatek,mt6577-mmc-ram";
 		reg = <0xc1220000 0x1000>;
-		clocks = <&msdc_clock>;
+		clocks = <&pericfg CLK_MT6577_MSDC0>;
 		clock-names = "source";
 		bus-width = <4>;
 		max-frequency = <12000000>;
