@@ -949,18 +949,20 @@ static void msdc_set_buswidth(struct msdc_host *host, u32 width)
 	writel(val, &host->base->sdc_cfg);
 }
 
-static void msdc_set_mclk(struct udevice *dev,
+static int msdc_set_mclk(struct udevice *dev,
 			  struct msdc_host *host, enum bus_mode timing, u32 hz)
 {
 	u32 mode;
 	u32 div;
 	u32 sclk;
 	u32 reg;
+	int ret;
 
 	if (!hz) {
 		host->mclk = 0;
+		host->sclk = 0;
 		clrbits_le32(&host->base->msdc_cfg, MSDC_CFG_CKPDN);
-		return;
+		return 0;
 	}
 
 	if (!host->dev_comp->mt6577 && host->dev_comp->clk_div_bits == 8)
@@ -1029,8 +1031,13 @@ static void msdc_set_mclk(struct udevice *dev,
 				FIELD_PREP(MSDC_CFG_CKDIV_EXT, div));
 	}
 
-	readl_poll_timeout(&host->base->msdc_cfg, reg,
+	ret = readl_poll_timeout(&host->base->msdc_cfg, reg,
 			   reg & MSDC_CFG_CKSTB, 1000000);
+	if (ret) {
+		host->mclk = 0;
+		host->sclk = 0;
+		return ret;
+	}
 
 	setbits_le32(&host->base->msdc_cfg, MSDC_CFG_CKPDN);
 	host->sclk = sclk;
@@ -1055,6 +1062,7 @@ static void msdc_set_mclk(struct udevice *dev,
 	}
 
 	dev_dbg(dev, "sclk: %d, timing: %d\n", host->sclk, timing);
+	return 0;
 }
 
 static int msdc_ops_set_ios(struct udevice *dev)
@@ -1072,7 +1080,7 @@ static int msdc_ops_set_ios(struct udevice *dev)
 		clock = mmc->cfg->f_min;
 
 	if (host->mclk != clock || host->timing != mmc->selected_mode)
-		msdc_set_mclk(dev, host, mmc->selected_mode, clock);
+		return msdc_set_mclk(dev, host, mmc->selected_mode, clock);
 
 	return 0;
 }
@@ -1882,10 +1890,13 @@ disable:
 static int msdc_drv_remove(struct udevice *dev)
 {
 	struct msdc_host *host = dev_get_priv(dev);
+	int ret;
 
 	if (!host->quiesced) {
 		writel(0, &host->base->msdc_inten);
-		msdc_set_mclk(dev, host, MMC_LEGACY, 0);
+		ret = msdc_set_mclk(dev, host, MMC_LEGACY, 0);
+		if (ret)
+			return ret;
 		host->quiesced = true;
 	}
 	return msdc_set_clocks(host, false);
