@@ -32,7 +32,11 @@ static int check_channel(struct udevice *dev, int value, bool number_or_mask,
 			 const char *caller_function)
 {
 	struct adc_uclass_plat *uc_pdata = dev_get_uclass_plat(dev);
-	unsigned mask = number_or_mask ? (1 << value) : value;
+	unsigned int mask;
+
+	if (number_or_mask && (value < 0 || value > ADC_MAX_CHANNEL))
+		return -EINVAL;
+	mask = number_or_mask ? (1U << value) : (unsigned int)value;
 
 	/* For the real ADC hardware, some ADC channels can be inactive.
 	 * For example if device has 4 analog channels, and only channels
@@ -365,6 +369,21 @@ int adc_raw_to_uV(struct udevice *dev, unsigned int raw, int *uV)
 	*uV = raw64;
 
 	return 0;
+}
+
+int adc_channel_raw_to_uV(struct udevice *dev, int channel, unsigned int raw,
+			  int *uV)
+{
+	const struct adc_ops *ops = dev_get_driver_ops(dev);
+	int ret;
+
+	ret = check_channel(dev, channel, CHECK_NUMBER, __func__);
+	if (ret)
+		return ret;
+	if (ops->channel_raw_to_uv)
+		return ops->channel_raw_to_uv(dev, channel, raw, uV);
+
+	return adc_raw_to_uV(dev, raw, uV);
 }
 
 static int adc_vdd_plat_set(struct udevice *dev)

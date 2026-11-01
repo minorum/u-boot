@@ -159,6 +159,8 @@ struct adc_ops {
 	 * @return:       0 if OK, -ve on error
 	 */
 	int (*stop)(struct udevice *dev);
+	int (*channel_raw_to_uv)(struct udevice *dev, int channel,
+				 unsigned int raw, int *uV);
 };
 
 /**
@@ -306,5 +308,8 @@ int adc_stop(struct udevice *dev);
  * @return:  0 on success or -ve on error
  */
 int adc_raw_to_uV(struct udevice *dev, unsigned int raw, int *uV);
+
+int adc_channel_raw_to_uV(struct udevice *dev, int channel, unsigned int raw,
+			  int *uV);
 
 #endif

@@ -71,6 +71,7 @@ static int do_adc_single(struct cmd_tbl *cmdtp, int flag, int argc,
 	char *varname = NULL;
 	struct udevice *dev;
 	unsigned int data;
+	unsigned long channel;
 	int ret, uV, val;
 
 	if (argc < 3)
@@ -79,8 +80,10 @@ static int do_adc_single(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (argc >= 4)
 		varname = argv[3];
 
-	ret = adc_channel_single_shot(argv[1], simple_strtol(argv[2], NULL, 0),
-				      &data);
+	ret = strict_strtoul(argv[2], 0, &channel);
+	if (ret || channel > ADC_MAX_CHANNEL)
+		return CMD_RET_USAGE;
+	ret = adc_channel_single_shot(argv[1], channel, &data);
 	if (ret) {
 		printf("Error getting single shot for device %s channel %s (ret=%d)\n",
 		       argv[1], argv[2], ret);
@@ -88,7 +91,7 @@ static int do_adc_single(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 
 	ret = uclass_get_device_by_name(UCLASS_ADC, argv[1], &dev);
-	if (!ret && !adc_raw_to_uV(dev, data, &uV)) {
+	if (!ret && !adc_channel_raw_to_uV(dev, channel, data, &uV)) {
 		val = uV;
 		printf("%u, %d uV\n", data, uV);
 	} else {
@@ -143,7 +146,7 @@ static int do_adc_scan(struct cmd_tbl *cmdtp, int flag, int argc,
 	for (chan = 0, i = 0; chan < ADC_MAX_CHANNEL; chan++) {
 		if (!(ch_mask & ADC_CHANNEL(chan)))
 			continue;
-		if (!adc_raw_to_uV(dev, ch[i].data, &uV))
+		if (!adc_channel_raw_to_uV(dev, ch[i].id, ch[i].data, &uV))
 			printf("[%02d]: %u, %d uV\n", ch[i].id, ch[i].data, uV);
 		else
 			printf("[%02d]: %u\n", ch[i].id, ch[i].data);
