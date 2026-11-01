@@ -2,6 +2,7 @@
 /dts-v1/;
 #include <dt-bindings/clock/mediatek,mt6577-clk.h>
 #include <dt-bindings/clock/mediatek,mt6577-mmsys.h>
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 
@@ -10,6 +11,45 @@
 	compatible = "modecom,freetab8001", "mediatek,mt6577";
 	#address-cells = <1>;
 	#size-cells = <1>;
+
+	backlight: backlight {
+		compatible = "gpio-backlight";
+		gpios = <&pio 48 GPIO_ACTIVE_HIGH>;
+	};
+
+	panel {
+		compatible = "modecom,freetab8001-display";
+		modecom,control-gpios = <&pio 100 GPIO_ACTIVE_HIGH>,
+					<&pio 66 GPIO_ACTIVE_HIGH>,
+					<&pio 12 GPIO_ACTIVE_HIGH>,
+					<&pio 49 GPIO_ACTIVE_HIGH>,
+					<&pio 84 GPIO_ACTIVE_HIGH>,
+					<&pio 52 GPIO_ACTIVE_HIGH>;
+		backlight = <&backlight>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&dpi_out>;
+			};
+		};
+	};
+
+	dpi@c208c000 {
+		compatible = "mediatek,mt6577-dpi";
+		reg = <0xc208c000 0xb8>;
+		clocks = <&mmsys CLK_MT6577_MM_DPI>,
+			 <&mmsys CLK_MT6577_MM_LARB1>,
+			 <&mmsys CLK_MT6577_MM_LARB1_EMI>, <&mipi_tx>;
+		clock-names = "engine", "larb", "larb-emi", "pll";
+		mediatek,mmsys = <&mmsys>;
+		bootph-all;
+
+		port {
+			dpi_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
 
 	pio: pinctrl@c0005000 {
 		compatible = "mediatek,mt6577-pinctrl";
