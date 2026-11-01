@@ -18,9 +18,17 @@ static int gpio_backlight_enable(struct udevice *dev)
 {
 	struct gpio_backlight_priv *priv = dev_get_priv(dev);
 
-	dm_gpio_set_value(&priv->gpio, 1);
+	return dm_gpio_set_value(&priv->gpio, 1);
+}
 
-	return 0;
+static int gpio_backlight_set_brightness(struct udevice *dev, int percent)
+{
+	struct gpio_backlight_priv *priv = dev_get_priv(dev);
+
+	if (percent < BACKLIGHT_DEFAULT || percent > BACKLIGHT_MAX)
+		return -EINVAL;
+	return dm_gpio_set_value(&priv->gpio,
+				 percent == BACKLIGHT_DEFAULT || percent > 0);
 }
 
 static int gpio_backlight_of_to_plat(struct udevice *dev)
@@ -46,13 +54,14 @@ static int gpio_backlight_probe(struct udevice *dev)
 	struct gpio_backlight_priv *priv = dev_get_priv(dev);
 
 	if (priv->def_value)
-		gpio_backlight_enable(dev);
+		return gpio_backlight_enable(dev);
 
 	return 0;
 }
 
 static const struct backlight_ops gpio_backlight_ops = {
 	.enable	= gpio_backlight_enable,
+	.set_brightness = gpio_backlight_set_brightness,
 };
 
 static const struct udevice_id gpio_backlight_ids[] = {
