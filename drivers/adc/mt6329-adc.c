@@ -17,6 +17,11 @@ struct mt6329_adc_priv {
 	int gain;
 	int offset;
 	unsigned int value;
+	int saved_control;
+	int saved_config;
+	int saved_bias;
+	bool restore_pending;
+	bool restore_temperature;
 };
 
 static int mt6329_adc_read_once(struct udevice *dev, unsigned int channel,
@@ -52,17 +57,47 @@ static int mt6329_adc_read_once(struct udevice *dev, unsigned int channel,
 	return 0;
 }
 
+static int mt6329_adc_restore(struct udevice *dev)
+{
+	struct mt6329_adc_priv *priv = dev_get_priv(dev);
+	struct udevice *pmic = dev->parent;
+	int ret, err;
+
+	if (!priv->restore_pending)
+		return 0;
+	ret = pmic_clrsetbits(pmic, MT6329_ADC_CONTROL, MT6329_ADC_START, 0);
+	if (priv->restore_temperature) {
+		err = pmic_clrsetbits(pmic, MT6329_ADC_BIAS, MT6329_ADC_TDET,
+				      priv->saved_bias & MT6329_ADC_TDET);
+		if (!ret)
+			ret = err;
+	}
+	err = pmic_reg_write(pmic, MT6329_ADC_CONFIG, priv->saved_config);
+	if (!ret)
+		ret = err;
+	err = pmic_reg_write(pmic, MT6329_ADC_CONTROL, priv->saved_control);
+	if (!ret)
+		ret = err;
+	if (!ret)
+		priv->restore_pending = false;
+
+	return ret;
+}
+
 static int mt6329_adc_start_channel(struct udevice *dev, int channel)
 {
 	struct mt6329_adc_priv *priv = dev_get_priv(dev);
 	struct udevice *pmic = dev->parent;
 	unsigned int hw_channel = channel ? 3 : 1;
 	unsigned int sum = 0, value;
-	int control, config, bias = 0, ret, cleanup, err;
+	int control, config, bias = 0, ret, cleanup;
 
 	if (channel < 0 || channel > 1)
 		return -EINVAL;
 	priv->channel = -1;
+	ret = mt6329_adc_restore(dev);
+	if (ret)
+		return ret;
 	control = pmic_reg_read(pmic, MT6329_ADC_CONTROL);
 	if (control < 0)
 		return control;
@@ -76,6 +111,11 @@ static int mt6329_adc_start_channel(struct udevice *dev, int channel)
 		if (bias < 0)
 			return bias;
 	}
+	priv->saved_control = control;
+	priv->saved_config = config;
+	priv->saved_bias = bias;
+	priv->restore_temperature = channel == 1;
+	priv->restore_pending = true;
 	ret = pmic_clrsetbits(pmic, MT6329_ADC_CONTROL, 0xf2, hw_channel << 4 | 2);
 	if (ret)
 		goto restore;
@@ -97,19 +137,7 @@ static int mt6329_adc_start_channel(struct udevice *dev, int channel)
 	}
 
 restore:
-	cleanup = pmic_clrsetbits(pmic, MT6329_ADC_CONTROL, MT6329_ADC_START, 0);
-	if (channel) {
-		err = pmic_clrsetbits(pmic, MT6329_ADC_BIAS, MT6329_ADC_TDET,
-				      bias & MT6329_ADC_TDET);
-		if (!cleanup)
-			cleanup = err;
-	}
-	err = pmic_reg_write(pmic, MT6329_ADC_CONFIG, config);
-	if (!cleanup)
-		cleanup = err;
-	err = pmic_reg_write(pmic, MT6329_ADC_CONTROL, control);
-	if (!cleanup)
-		cleanup = err;
+	cleanup = mt6329_adc_restore(dev);
 	if (ret || cleanup)
 		return ret ?: cleanup;
 	priv->value = (sum + MT6329_ADC_SAMPLES / 2) / MT6329_ADC_SAMPLES;
@@ -154,7 +182,7 @@ static int mt6329_adc_stop(struct udevice *dev)
 
 	priv->channel = -1;
 
-	return 0;
+	return mt6329_adc_restore(dev);
 }
 
 static int mt6329_adc_probe(struct udevice *dev)
@@ -205,4 +233,5 @@ U_BOOT_DRIVER(mt6329_adc) = {
 	.remove = mt6329_adc_stop,
 	.ops = &mt6329_adc_ops,
 	.priv_auto = sizeof(struct mt6329_adc_priv),
+	.flags = DM_FLAG_OS_PREPARE,
 };
