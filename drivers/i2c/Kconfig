@@ -300,10 +300,10 @@ config SYS_I2C_MESON
 	  both 7-bit and 10-bit addresses.
 
 config SYS_I2C_MT6577_DUAL
-	bool "MediaTek MT6577 dual I2C channel1"
+	bool "MediaTek MT6577 FIFO I2C"
 	depends on DM_I2C && CLK
 	help
-	  Enable byte-data PIO transfers on MT6577 dual I2C channel1.
+	  Enable byte-data PIO transfers on MT6577 I2C and dual I2C channel1.
 
 config SYS_I2C_MTK
 	bool "MediaTek I2C driver"

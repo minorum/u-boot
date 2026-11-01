@@ -31,7 +31,7 @@ struct mt6577_clock {
 
 struct mt6577_clk_priv {
 	void __iomem *base;
-	struct clk *clocks[5];
+	struct clk *clocks[6];
 	unsigned int count;
 };
 
@@ -271,6 +271,11 @@ static int mt6577_clock_probe(struct udevice *dev)
 		clock = clk_register_gate(dev, "mt6577_i2c_dual", parents[0], CLK_IS_CRITICAL,
 					  priv->base + 0x10, 30, CLK_GATE_SET_TO_DISABLE, NULL);
 		ret = mt6577_keep_clock(dev, clock, CLK_MT6577_I2C_DUAL);
+		if (ret)
+			goto fail;
+		clock = clk_register_gate(dev, "mt6577_i2c0", parents[0], 0,
+					  priv->base + 0x10, 28, CLK_GATE_SET_TO_DISABLE, NULL);
+		ret = mt6577_keep_clock(dev, clock, CLK_MT6577_I2C0);
 		if (ret)
 			goto fail;
 	}

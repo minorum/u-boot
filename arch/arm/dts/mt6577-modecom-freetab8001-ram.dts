@@ -12,6 +12,11 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
+	aliases {
+		i2c0 = &pmic_i2c;
+		i2c1 = &charger_i2c;
+	};
+
 	backlight: backlight {
 		compatible = "gpio-backlight";
 		gpios = <&pio 48 GPIO_ACTIVE_HIGH>;
@@ -121,7 +126,20 @@
 		#clock-cells = <1>;
 	};
 
-	i2c@c1014000 {
+	charger_i2c: i2c@c1012000 {
+		compatible = "mediatek,mt6577-i2c";
+		reg = <0xc1012000 0x70>;
+		interrupt-parent = <&sysirq>;
+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_LOW>;
+		clocks = <&pericfg CLK_MT6577_I2C0>;
+		clock-names = "main";
+		clock-div = <16>;
+		clock-frequency = <100000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+
+	pmic_i2c: i2c@c1014000 {
 		compatible = "mediatek,mt6577-i2c-dual";
 		reg = <0xc1014000 0xc0>;
 		clocks = <&pericfg CLK_MT6577_I2C_DUAL>;

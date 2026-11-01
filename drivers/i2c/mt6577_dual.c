@@ -122,6 +122,7 @@ static const struct dm_i2c_ops mt6577_dual_ops = {
 };
 
 static const struct udevice_id mt6577_dual_ids[] = {
+	{ .compatible = "mediatek,mt6577-i2c" },
 	{ .compatible = "mediatek,mt6577-i2c-dual" },
 	{ }
 };
