@@ -452,6 +452,9 @@ static int ncp1851_read_profile(struct ncp1851 *chip)
 		ret = ncp1851_encode(value, 3100000, 100000, 5, &chip->vsys);
 		if (ret)
 			return ret;
+		if (3100000 + chip->vsys * 100000 >=
+		    3300000 + chip->vreg * 25000)
+			return -EINVAL;
 	}
 	return 0;
 }
