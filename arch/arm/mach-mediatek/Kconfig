@@ -15,6 +15,7 @@ config TARGET_MT6577
 	select CLK
 	select CLK_CCF
 	select CLK_AUTO_ID
+	select REGMAP
 	help
 	  RAM-only MODECOM FreeTAB 8001 support.
 	  Requires a preceding download agent to initialize DRAM and USB.

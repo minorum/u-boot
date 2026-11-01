@@ -418,6 +418,7 @@ R:	GSS_MTK_Uboot_upstream <GSS_MTK_Uboot_upstream@mediatek.com>
 T:	git https://git.u-boot-project.org/u-boot/custodians/u-boot-mediatek.git
 S:	Maintained
 F:	arch/arm/dts/mt*
+F:	drivers/clk/mediatek/clk-mt6577*.c
 F:	drivers/phy/phy-mt6577-usb.c
 F:	drivers/pinctrl/mediatek/pinctrl-mt6577.c
 F:	drivers/power/domain/mt*

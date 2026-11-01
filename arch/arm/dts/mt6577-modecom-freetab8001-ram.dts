@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /dts-v1/;
 #include <dt-bindings/clock/mediatek,mt6577-clk.h>
+#include <dt-bindings/clock/mediatek,mt6577-mmsys.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 
@@ -15,6 +16,22 @@
 		reg = <0xc0005000 0x1000>;
 		gpio-controller;
 		#gpio-cells = <2>;
+	};
+
+	mmsys: clock-controller@c2080000 {
+		compatible = "mediatek,mt6577-mmsys", "syscon";
+		reg = <0xc2080000 0x1000>;
+		#clock-cells = <1>;
+	};
+
+	mipi_tx: clock-controller@c20a3800 {
+		compatible = "mediatek,mt6577-mipi-tx";
+		reg = <0xc20a3800 0x34>;
+		clocks = <&clk26m>;
+		#clock-cells = <0>;
+		mediatek,mmsys = <&mmsys>;
+		mediatek,apmixedsys = <&apmixedsys>;
+		mediatek,infracfg = <&infracfg>;
 	};
 
 	memory@10000000 {
