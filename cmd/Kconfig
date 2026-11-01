@@ -1817,6 +1817,15 @@ config CMD_TEMPERATURE
 	help
 	  Provides a way to list thermal sensors and to get their readings.
 
+config CMD_CHARGER
+	bool "charger - display charger status"
+	depends on DM_CHARGER
+	help
+	  Enable the charger status command for driver-model chargers.
+	  Display state, health, input presence, battery measurements and
+	  the configured input current limit for a named device.
+	  Reading status may refresh the charger's charging policy.
+
 config CMD_UFS
 	bool "ufs - Universal Flash Storage commands"
 	depends on UFS
