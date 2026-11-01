@@ -15,6 +15,7 @@
 #include <malloc.h>
 #include <mapmem.h>
 #include <stdbool.h>
+#include <asm/cache.h>
 #include <asm/gpio.h>
 #include <asm/types.h>
 #include <dm/device_compat.h>
@@ -49,6 +50,7 @@
 #define MT6577_DAT_RDDLY0		0xf0
 #define MT6577_DAT_RDDLY1		0xf4
 #define MT6577_ECO_VER		0x104
+#define MT6577_MAX_REQUEST	32768
 
 /* MSDC_PS */
 #define MSDC_PS_DAT0			BIT(16)
@@ -358,6 +360,8 @@ struct msdc_host {
 	u32 clocks_enabled;
 	bool quiesced;
 	int dma_error;
+	void *dma_buffer;
+	bool dma_disabled;
 	u32 mclk;		/* mmc framework required bus clock */
 	u32 sclk;		/* actual calculated bus clock */
 
@@ -391,6 +395,9 @@ struct msdc_host {
 	struct msdc_tune_para def_tune_para;
 	struct msdc_tune_para saved_tune_para;
 };
+
+static int msdc_set_mclk(struct udevice *dev, struct msdc_host *host,
+			 enum bus_mode timing, u32 hz);
 
 static int msdc_reset_hw(struct msdc_host *host)
 {
@@ -853,7 +860,8 @@ static int msdc_dma_done(struct msdc_host *host, int events)
 
 static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 {
-	u32 size, status;
+	u32 size, status, cache_size;
+	ulong cache_addr;
 	int ret;
 	const void *buf;
 	enum dma_data_direction dir;
@@ -868,7 +876,15 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 		dir = DMA_FROM_DEVICE;
 	}
 
-	dma_addr = msdc_flush_membuf(buf, size, dir);
+	cache_size = size;
+	if (host->dev_comp->mt6577) {
+		buf = host->dma_buffer;
+		cache_size = MT6577_MAX_REQUEST;
+	}
+	cache_addr = (ulong)buf;
+	dma_addr = msdc_flush_membuf(buf, cache_size, dir);
+	if (host->dev_comp->mt6577)
+		dma_addr = map_to_sysmem(buf);
 	msdc_dma_start(host, dma_addr, size);
 
 	ret = readl_poll_timeout(&host->base->msdc_int, status,
@@ -880,6 +896,7 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 		ret = mt6577_dma_stop(host);
 		if (ret)
 			return ret;
+		setbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
 	} else {
 		msdc_dma_stop(host);
 	}
@@ -889,26 +906,73 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 	 * cache-refill during the DMA operations (pre-fetching)
 	 */
 	if (data->flags & MMC_DATA_READ)
-		invalidate_dcache_range(dma_addr, dma_addr + size);
+		invalidate_dcache_range(cache_addr, cache_addr + cache_size);
 
-	return msdc_dma_done(host, status);
+	ret = msdc_dma_done(host, status);
+	if (!ret && host->dev_comp->mt6577 && data->flags == MMC_DATA_READ)
+		memcpy(data->dest, host->dma_buffer, size);
+	return ret;
+}
+
+static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
+{
+	if (!data->blocksize || data->blocksize > 512 || data->blocksize % 4 ||
+	    !data->blocks || data->blocks > MT6577_MAX_REQUEST / data->blocksize ||
+	    (data->flags != MMC_DATA_READ && data->flags != MMC_DATA_WRITE) ||
+	    (data->flags == MMC_DATA_READ ? !data->dest : !data->src))
+		return -EINVAL;
+
+	writel(DATA_INTS_MASK, &host->base->msdc_int);
+	if (!host->dev_comp->use_dma_mode || host->dma_disabled) {
+		setbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
+		return 0;
+	}
+	if (!host->dma_buffer) {
+		host->dma_buffer = memalign(ARCH_DMA_MINALIGN, MT6577_MAX_REQUEST);
+		if (!host->dma_buffer)
+			return -ENOMEM;
+	}
+	if (map_to_sysmem(host->dma_buffer) > U32_MAX - MT6577_MAX_REQUEST + 1)
+		return -ERANGE;
+	if (data->flags == MMC_DATA_WRITE)
+		memcpy(host->dma_buffer, data->src, data->blocks * data->blocksize);
+	clrbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
+	return 0;
+}
+
+static void mt6577_finish_request(struct udevice *dev, struct msdc_host *host,
+				  int error)
+{
+	if (host->dma_error)
+		return;
+	setbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
+	if (!error)
+		return;
+	host->dma_disabled = true;
+	host->dma_error = msdc_set_mclk(dev, host, host->timing,
+					min(host->mclk, 12000000U));
+	dev_warn(dev, "MMC error %d, PIO fallback at %u Hz\n", error, host->sclk);
 }
 
 static int msdc_start_data(struct msdc_host *host, struct mmc_data *data)
 {
-	int ret;
+	int ret, cleanup;
 
 	if (data->flags == MMC_DATA_WRITE)
 		host->last_data_write = 1;
 
-	if (host->dev_comp->use_dma_mode)
+	if (host->dev_comp->use_dma_mode &&
+	    (!host->dev_comp->mt6577 || !host->dma_disabled))
 		ret = msdc_dma_transfer(host, data);
 	else
 		ret = msdc_pio_transfer(host, data);
 
 	if (ret && !host->dma_error) {
-		msdc_reset_hw(host);
-		msdc_fifo_clr(host);
+		cleanup = msdc_reset_hw(host);
+		if (!cleanup || !host->dev_comp->mt6577)
+			cleanup = msdc_fifo_clr(host);
+		if (host->dev_comp->mt6577 && cleanup)
+			host->dma_error = cleanup;
 	}
 
 	return ret;
@@ -923,15 +987,26 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	if (host->dma_error)
 		return host->dma_error;
 
+	if (host->dev_comp->mt6577 && data) {
+		data_ret = mt6577_prepare_data(host, data);
+		if (data_ret)
+			return data_ret;
+	}
+
 	cmd_ret = msdc_start_command(host, cmd, data);
 	if (cmd_ret &&
 	    !(cmd_ret == -EIO &&
 	    (cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK ||
-	    cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK_HS200)))
+	    cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK_HS200))) {
+		if (host->dev_comp->mt6577 && data)
+			mt6577_finish_request(dev, host, cmd_ret);
 		return cmd_ret;
+	}
 
 	if (data) {
 		data_ret = msdc_start_data(host, data);
+		if (host->dev_comp->mt6577)
+			mt6577_finish_request(dev, host, data_ret);
 		if (cmd_ret)
 			return cmd_ret;
 		else
@@ -1002,6 +1077,9 @@ static int msdc_set_mclk(struct udevice *dev,
 	u32 sclk;
 	u32 reg;
 	int ret;
+
+	if (host->dev_comp->mt6577 && host->dma_disabled)
+		hz = min(hz, 12000000U);
 
 	if (!hz) {
 		host->mclk = 0;
@@ -1908,6 +1986,8 @@ static int msdc_drv_probe(struct udevice *dev)
 		cfg->f_max = host->src_clk_freq;
 
 	cfg->b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
+	if (host->dev_comp->mt6577)
+		cfg->b_max = min(cfg->b_max, MT6577_MAX_REQUEST / 512U);
 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
 
 	host->mmc = &plat->mmc;
@@ -1927,6 +2007,7 @@ static int msdc_drv_probe(struct udevice *dev)
 	}
 	host->quiesced = false;
 	host->dma_error = 0;
+	host->dma_disabled = false;
 
 	upriv->mmc = &plat->mmc;
 
@@ -1948,7 +2029,12 @@ static int msdc_drv_remove(struct udevice *dev)
 			return ret;
 		host->quiesced = true;
 	}
-	return msdc_set_clocks(host, false);
+	ret = msdc_set_clocks(host, false);
+	if (!ret) {
+		free(host->dma_buffer);
+		host->dma_buffer = NULL;
+	}
+	return ret;
 }
 
 static int msdc_of_to_plat(struct udevice *dev)
@@ -2052,6 +2138,7 @@ static const struct dm_mmc_ops msdc_ops = {
 static const struct msdc_compatible mt6577_compat = {
 	.clk_div_bits = 8,
 	.mt6577 = true,
+	.use_dma_mode = true,
 };
 
 static const struct msdc_compatible mt7620_compat = {
