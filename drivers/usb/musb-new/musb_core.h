@@ -217,6 +217,7 @@ struct musb_platform_ops {
 	void	(*try_idle)(struct musb *musb, unsigned long timeout);
 
 	int	(*vbus_status)(struct musb *musb);
+	int	(*vbus_draw)(struct musb *musb, unsigned int ma);
 	void	(*set_vbus)(struct musb *musb, int on);
 
 	int	(*adjust_channel_params)(struct dma_channel *channel,

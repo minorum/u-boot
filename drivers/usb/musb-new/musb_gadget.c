@@ -1745,6 +1745,10 @@ static int musb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 		return -EOPNOTSUPP;
 	return usb_phy_set_power(musb->xceiv, mA);
 #else
+	struct musb *musb = gadget_to_musb(gadget);
+
+	if (musb->ops->vbus_draw)
+		return musb->ops->vbus_draw(musb, mA);
 	return 0;
 #endif
 }
@@ -1770,6 +1774,8 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 
 	pm_runtime_put(musb->controller);
 
+	if (!is_on)
+		musb_gadget_vbus_draw(gadget, 0);
 	return 0;
 }
 
@@ -1784,6 +1790,7 @@ static int musb_gadget_stop(struct usb_gadget *g)
 	struct musb	*musb = gadget_to_musb(g);
 
 	musb_stop(musb);
+	musb_gadget_vbus_draw(g, 0);
 	return 0;
 }
 #endif
@@ -2167,6 +2174,10 @@ void musb_g_resume(struct musb *musb)
 		WARNING("unhandled RESUME transition (%s)\n",
 				otg_state_string(musb->xceiv->state));
 	}
+#else
+	musb->is_suspended = 0;
+	if (musb->gadget_driver && musb->gadget_driver->resume)
+		musb->gadget_driver->resume(&musb->g);
 #endif
 }
 
@@ -2199,6 +2210,11 @@ void musb_g_suspend(struct musb *musb)
 		WARNING("unhandled SUSPEND transition (%s)\n",
 				otg_state_string(musb->xceiv->state));
 	}
+#else
+	musb->is_suspended = 1;
+	musb_gadget_vbus_draw(&musb->g, 2);
+	if (musb->gadget_driver && musb->gadget_driver->suspend)
+		musb->gadget_driver->suspend(&musb->g);
 #endif
 }
 
@@ -2315,5 +2331,7 @@ __acquires(musb->lock)
 	/* start with default limits on VBUS power draw */
 	(void) musb_gadget_vbus_draw(&musb->g,
 			is_otg_enabled(musb) ? 8 : 100);
+#else
+	musb_gadget_vbus_draw(&musb->g, 100);
 #endif
 }

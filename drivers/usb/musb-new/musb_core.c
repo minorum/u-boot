@@ -664,6 +664,16 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 			break;
 		}
 	}
+#else
+	if (is_peripheral_active(musb)) {
+		if (int_usb & MUSB_INTR_SUSPEND) {
+			musb_g_suspend(musb);
+			handled = IRQ_HANDLED;
+		} else if (int_usb & MUSB_INTR_RESUME) {
+			musb_g_resume(musb);
+			handled = IRQ_HANDLED;
+		}
+	}
 #endif
 
 	if (int_usb & MUSB_INTR_CONNECT) {

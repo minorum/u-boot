@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include <dm.h>
 #include <clk.h>
+#include <cyclic.h>
 #include <generic-phy.h>
 #include <linux/delay.h>
+#include <limits.h>
+#include <power/charger.h>
 #include "musb_uboot.h"
 
 #define MT6577_SWRST 0x74
@@ -13,10 +16,64 @@ struct mt6577_glue {
 	struct musb *musb;
 	struct clk *bus;
 	struct phy phy;
+	struct udevice *charger;
+	struct cyclic_info budget_poll;
+	unsigned int budget_ma;
+	bool budget_pending;
+	bool budget_busy;
+	bool budget_registered;
+	bool stopping;
 	bool bus_on;
 	bool initialized;
 	bool powered;
 };
+
+static int mt6577_apply_budget(struct mt6577_glue *glue)
+{
+	unsigned int ma;
+	int ret;
+
+	if (!IS_ENABLED(CONFIG_DM_CHARGER) || !glue->charger ||
+	    !glue->budget_pending)
+		return 0;
+	if (glue->budget_busy)
+		return -EBUSY;
+	if (!device_active(glue->charger))
+		return -ENODEV;
+	glue->budget_busy = true;
+	ma = glue->budget_ma;
+	ret = charger_set_input_current(glue->charger, ma * 1000);
+	if (!ret && ma == glue->budget_ma)
+		glue->budget_pending = false;
+	glue->budget_busy = false;
+	return ret;
+}
+
+static int mt6577_vbus_draw(struct musb *musb, unsigned int ma)
+{
+	struct mt6577_glue *glue = container_of(musb->controller,
+						    struct mt6577_glue, dev);
+
+	if (ma > INT_MAX / 1000)
+		return -EINVAL;
+	glue->budget_ma = glue->stopping ? 0 : ma;
+	glue->budget_pending = true;
+	return 0;
+}
+
+static void mt6577_budget_poll(struct cyclic_info *cyclic)
+{
+	struct mt6577_glue *glue = container_of(cyclic, struct mt6577_glue,
+						    budget_poll);
+
+	if (glue->musb && glue->bus_on && glue->budget_ma &&
+	    (musb_readb(glue->musb->mregs, MUSB_INTRUSB) &
+	     (MUSB_INTR_SUSPEND | MUSB_INTR_RESET | MUSB_INTR_DISCONNECT))) {
+		glue->budget_ma = 0;
+		glue->budget_pending = true;
+	}
+	mt6577_apply_budget(glue);
+}
 
 static volatile u32 mt6577_reset_trace[6];
 
@@ -130,6 +187,7 @@ static int mt6577_init(struct musb *musb)
 
 static const struct musb_platform_ops mt6577_ops = {
 	.init = mt6577_init,
+	.vbus_draw = mt6577_vbus_draw,
 };
 
 static struct musb_fifo_cfg mt6577_fifo[] = {
@@ -166,6 +224,19 @@ static int mt6577_probe(struct udevice *dev)
 	ret = generic_phy_get_by_name(dev, "usb2-phy", &glue->phy);
 	if (ret)
 		return ret;
+	if (dev_read_prop(dev, "power-supplies", NULL)) {
+		if (!IS_ENABLED(CONFIG_DM_CHARGER))
+			return -ENODEV;
+		ret = uclass_get_device_by_phandle(UCLASS_CHARGER, dev,
+						   "power-supplies", &glue->charger);
+		if (ret)
+			return ret;
+		glue->budget_ma = 0;
+		glue->budget_pending = true;
+		ret = mt6577_apply_budget(glue);
+		if (ret)
+			return ret;
+	}
 	ret = mt6577_resources_on(glue);
 	if (ret)
 		return ret;
@@ -181,6 +252,11 @@ static int mt6577_probe(struct udevice *dev)
 		glue->musb = NULL;
 		goto disable;
 	}
+	if (glue->charger) {
+		cyclic_register(&glue->budget_poll, mt6577_budget_poll, 1000,
+				"mt6577-usb-budget");
+		glue->budget_registered = true;
+	}
 	return 0;
 disable:
 	cleanup = mt6577_resources_off(glue);
@@ -190,6 +266,15 @@ disable:
 static int mt6577_remove(struct udevice *dev)
 {
 	struct mt6577_glue *glue = dev_get_priv(dev);
+	int ret, cleanup;
+
+	if (glue->budget_busy)
+		return -EBUSY;
+	glue->stopping = true;
+	if (glue->budget_registered) {
+		cyclic_unregister(&glue->budget_poll);
+		glue->budget_registered = false;
+	}
 
 	if (glue->musb) {
 		usb_del_gadget_udc(&glue->musb->g);
@@ -197,7 +282,13 @@ static int mt6577_remove(struct udevice *dev)
 		free(glue->musb);
 		glue->musb = NULL;
 	}
-	return mt6577_resources_off(glue);
+	glue->budget_ma = 0;
+	glue->budget_pending = true;
+	ret = mt6577_apply_budget(glue);
+	if (ret == -ENODEV)
+		ret = 0;
+	cleanup = mt6577_resources_off(glue);
+	return ret ? ret : cleanup;
 }
 
 static int mt6577_handle_interrupts(struct udevice *dev)
@@ -207,6 +298,7 @@ static int mt6577_handle_interrupts(struct udevice *dev)
 	if (!glue->musb)
 		return -ENODEV;
 	mt6577_interrupt(0, glue->musb);
+	mt6577_apply_budget(glue);
 	return 0;
 }
 

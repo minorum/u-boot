@@ -1447,6 +1447,7 @@ composite_suspend(struct usb_gadget *gadget)
 		composite->suspend(cdev);
 
 	cdev->suspended = 1;
+	usb_gadget_vbus_draw(gadget, 2);
 }
 
 static void
@@ -1466,6 +1467,9 @@ composite_resume(struct usb_gadget *gadget)
 	}
 
 	cdev->suspended = 0;
+	usb_gadget_vbus_draw(gadget, cdev->config ?
+		(cdev->config->bMaxPower ? 2 * cdev->config->bMaxPower :
+		 CONFIG_USB_GADGET_VBUS_DRAW) : 100);
 }
 
 static struct usb_gadget_driver composite_driver = {
