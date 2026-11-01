@@ -544,7 +544,7 @@ static int msdc_cmd_done(struct msdc_host *host, int events,
 	return ret;
 }
 
-static bool msdc_cmd_is_ready(struct msdc_host *host)
+static bool msdc_cmd_is_ready(struct msdc_host *host, const struct mmc_cmd *cmd)
 {
 	int ret;
 	u32 reg;
@@ -559,7 +559,8 @@ static bool msdc_cmd_is_ready(struct msdc_host *host)
 		return false;
 	}
 
-	if (host->last_resp_type == MMC_RSP_R1b || host->last_data_write) {
+	if ((host->last_resp_type == MMC_RSP_R1b || host->last_data_write) &&
+	    (!host->dev_comp->mt6577 || cmd->cmdidx != MMC_CMD_STOP_TRANSMISSION)) {
 		ret = readl_poll_timeout(&host->base->msdc_ps, reg,
 					 reg & MSDC_PS_DAT0, 1000000);
 
@@ -581,7 +582,7 @@ static int msdc_start_command(struct msdc_host *host, struct mmc_cmd *cmd,
 	u32 blocks = 0;
 	int ret;
 
-	if (!msdc_cmd_is_ready(host))
+	if (!msdc_cmd_is_ready(host, cmd))
 		return -EIO;
 
 	if (FIELD_GET(MSDC_FIFOCS_TXCNT, readl(&host->base->msdc_fifocs)) ||
@@ -941,14 +942,24 @@ static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
 }
 
 static void mt6577_finish_request(struct udevice *dev, struct msdc_host *host,
-				  int error)
+				  int error, u32 blocks)
 {
+	struct mmc_cmd stop = {
+		.cmdidx = MMC_CMD_STOP_TRANSMISSION,
+		.resp_type = MMC_RSP_R1b,
+	};
+
 	if (host->dma_error)
 		return;
 	setbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
 	if (!error)
 		return;
 	host->dma_disabled = true;
+	if (blocks > 1) {
+		host->dma_error = msdc_start_command(host, &stop, NULL);
+		if (host->dma_error)
+			return;
+	}
 	host->dma_error = msdc_set_mclk(dev, host, host->timing,
 					min(host->mclk, 12000000U));
 	dev_warn(dev, "MMC error %d, PIO fallback at %u Hz\n", error, host->sclk);
@@ -999,14 +1010,14 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	    (cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK ||
 	    cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK_HS200))) {
 		if (host->dev_comp->mt6577 && data)
-			mt6577_finish_request(dev, host, cmd_ret);
+			mt6577_finish_request(dev, host, cmd_ret, data->blocks);
 		return cmd_ret;
 	}
 
 	if (data) {
 		data_ret = msdc_start_data(host, data);
 		if (host->dev_comp->mt6577)
-			mt6577_finish_request(dev, host, data_ret);
+			mt6577_finish_request(dev, host, data_ret, data->blocks);
 		if (cmd_ret)
 			return cmd_ret;
 		else
