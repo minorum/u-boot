@@ -1401,6 +1401,11 @@ T:	git https://git.u-boot-project.org/u-boot/custodians/u-boot-mmc.git
 F:	drivers/mmc/
 N:	mmc
 
+NCP1851 BATTERY CHARGER DRIVER
+M:	Michal Andrzejczak <mit.mis@gmail.com>
+S:	Maintained
+F:	drivers/power/charger/ncp1851.c
+
 NETWORK
 M:	Jerome Forissier <jerome.forissier@arm.com>
 S:	Maintained

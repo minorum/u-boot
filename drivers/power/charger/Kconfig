@@ -6,3 +6,13 @@ config DM_CHARGER
 	  model. Current budgets use microamps and include zero authorization.
 	  Battery measurements and protections remain with the chip driver.
 	  This interface does not infer battery limits or available USB current.
+
+config CHARGER_NCP1851
+	bool "ON Semiconductor NCP1851 charger"
+	depends on DM_CHARGER && DM_I2C && ADC && DM_THERMAL
+	select CYCLIC
+	help
+	  Support NCP1851 and NCP1851A single-cell chargers with external ADC
+	  voltage and thermal monitoring. Explicit battery limits are required.
+	  Periodic safety checks service the hardware watchdog while charging.
+	  USB input authorization is supplied through the charger interface.
