@@ -24,6 +24,7 @@ struct mt6577_dual {
 	void __iomem *base;
 	struct clk clock;
 	bool push_pull;
+	bool busy;
 };
 
 static int mt6577_dual_timing(ulong rate)
@@ -41,7 +42,7 @@ static int mt6577_dual_timing(ulong rate)
 	return -ERANGE;
 }
 
-static int mt6577_dual_xfer(struct udevice *dev, struct i2c_msg *msg, int count)
+static int mt6577_dual_transfer(struct udevice *dev, struct i2c_msg *msg, int count)
 {
 	struct mt6577_dual *dual = dev_get_priv(dev);
 	void __iomem *base = dual->base;
@@ -98,6 +99,19 @@ static int mt6577_dual_xfer(struct udevice *dev, struct i2c_msg *msg, int count)
 disable:
 	cleanup = clk_disable(&dual->clock);
 	return cleanup ? cleanup : ret;
+}
+
+static int mt6577_dual_xfer(struct udevice *dev, struct i2c_msg *msg, int count)
+{
+	struct mt6577_dual *dual = dev_get_priv(dev);
+	int ret;
+
+	if (dual->busy)
+		return -EBUSY;
+	dual->busy = true;
+	ret = mt6577_dual_transfer(dev, msg, count);
+	dual->busy = false;
+	return ret;
 }
 
 static int mt6577_dual_speed(struct udevice *dev, uint speed)
