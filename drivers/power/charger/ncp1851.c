@@ -271,12 +271,19 @@ static int ncp1851_update(struct ncp1851 *chip)
 		chip->input_budget = min(chip->input_budget, 100000);
 	}
 	chip->online = online;
+	input = ncp1851_input_code(min(chip->input_budget, chip->input_max));
+	if (!online || input < 0 || chip->health != CHARGER_HEALTH_GOOD ||
+	    ncp1851_health(chip) != CHARGER_HEALTH_GOOD ||
+	    !ncp1851_configured(chip, input)) {
+		ret = ncp1851_inhibit(chip);
+		if (ret)
+			goto fail;
+	}
 	ret = ncp1851_measure(chip);
 	if (ret)
 		goto fail;
 	health = ncp1851_health(chip);
 	chip->health = health;
-	input = ncp1851_input_code(min(chip->input_budget, chip->input_max));
 	if (!online || input < 0 || health != CHARGER_HEALTH_GOOD) {
 		ret = ncp1851_inhibit(chip);
 		if (ret)
