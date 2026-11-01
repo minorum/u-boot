@@ -1180,6 +1180,11 @@ S:	Maintained
 F:	drivers/misc/gsc.c
 F:	include/gsc.h
 
+GENERIC ADC THERMAL SENSOR
+M:	Michal Andrzejczak <mit.mis@gmail.com>
+S:	Maintained
+F:	drivers/thermal/generic-adc-thermal.c
+
 GOLDFISH SERIAL DRIVER
 M:	Kuan-Wei Chiu <visitorckw@gmail.com>
 S:	Maintained

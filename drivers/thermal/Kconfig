@@ -8,6 +8,15 @@ config DM_THERMAL
 
 if DM_THERMAL
 
+config GENERIC_ADC_THERMAL
+	bool "Generic ADC thermal sensor"
+	depends on ADC
+	help
+	  Convert ADC voltage readings to millidegrees Celsius using the
+	  generic-adc-thermal device-tree lookup table. The ADC provider
+	  supplies channel-specific calibrated voltage measurements.
+	  The lookup table is required; native temperature ADCs are unsupported.
+
 config IMX_THERMAL
 	bool "Temperature sensor driver for Freescale i.MX SoCs"
 	depends on MX6 || MX7
