@@ -10,6 +10,13 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
+	pio: pinctrl@c0005000 {
+		compatible = "mediatek,mt6577-pinctrl";
+		reg = <0xc0005000 0x1000>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
 	memory@10000000 {
 		device_type = "memory";
 		reg = <0x10000000 0x04000000>;
