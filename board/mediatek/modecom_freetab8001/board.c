@@ -139,15 +139,28 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	return fdt_set_name(blob, node, name);
 }
 
+static void __efi_runtime modecom_reset(void __iomem *wdt, void __iomem *gpt)
+{
+	u32 start;
+
+	writew(0x1971, wdt + 0x08);
+	writew((readw(wdt) & 0xffe6) | 0x2214, wdt);
+	start = readl(gpt + 0x48);
+	while ((u32)(readl(gpt + 0x48) - start) < 1300)
+		;
+	writew(0x1209, wdt + 0x14);
+}
+
 void reset_cpu(void)
 {
-	writew(0x1209, (void *)0xc0000014);
+	modecom_reset((void *)0xc0000000, (void *)0xc1002000);
 	for (;;)
 		;
 }
 
 #ifdef CONFIG_EFI_LOADER
 static void __iomem *efi_wdt_base __efi_runtime_data;
+static void __iomem *efi_gpt_base __efi_runtime_data;
 
 void __efi_runtime EFIAPI efi_reset_system(enum efi_reset_type reset_type,
 					   efi_status_t reset_status,
@@ -155,14 +168,20 @@ void __efi_runtime EFIAPI efi_reset_system(enum efi_reset_type reset_type,
 {
 	if (reset_type == EFI_RESET_COLD || reset_type == EFI_RESET_WARM ||
 	    reset_type == EFI_RESET_PLATFORM_SPECIFIC)
-		writew(0x1209, efi_wdt_base + 0x14);
+		modecom_reset(efi_wdt_base, efi_gpt_base);
 	for (;;)
 		;
 }
 
 efi_status_t efi_reset_system_init(void)
 {
+	efi_status_t ret;
+
 	efi_wdt_base = (void *)0xc0000000;
-	return efi_add_runtime_mmio(&efi_wdt_base, SZ_4K);
+	ret = efi_add_runtime_mmio(&efi_wdt_base, SZ_4K);
+	if (ret != EFI_SUCCESS)
+		return ret;
+	efi_gpt_base = (void *)0xc1002000;
+	return efi_add_runtime_mmio(&efi_gpt_base, SZ_4K);
 }
 #endif
