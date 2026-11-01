@@ -1270,6 +1270,12 @@ M:	Raymond Mao <raymondmaoca@gmail.com>
 S:	Maintained
 F:	lib/mbedtls/
 
+MEDIATEK MT6329 PMIC ADC
+M:	Michal Andrzejczak <mit.mis@gmail.com>
+S:	Maintained
+F:	drivers/adc/mt6329-adc.c
+F:	drivers/power/pmic/mt6329.c
+
 MEMBUF
 M:	Simon Glass <sjg@chromium.org>
 S:	Maintained

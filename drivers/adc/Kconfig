@@ -73,6 +73,15 @@ config STM32_ADC
 	  - child driver to deal with individual ADC resources (declare ADC
 	  device and associated channels, start/stop conversions)
 
+config ADC_MT6329
+	bool "MediaTek MT6329 PMIC ADC"
+	depends on ADC && PMIC_MT6329
+	help
+	  Enable pack and thermistor voltage measurements using the MT6329
+	  PMIC ADC. The existing PMIC driver supplies register access.
+	  Measurements use factory calibration and channel-specific scaling.
+	  No charging control or battery capacity estimation is provided here.
+
 config ADC_IMX93
 	bool "Enable NXP IMX93 ADC driver"
 	depends on ADC
