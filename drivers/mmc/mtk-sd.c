@@ -11,6 +11,7 @@
 #include <dm.h>
 #include <mmc.h>
 #include <errno.h>
+#include <hang.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <stdbool.h>
@@ -20,6 +21,7 @@
 #include <dm/pinctrl.h>
 #include <linux/bitfield.h>
 #include <linux/bitops.h>
+#include <linux/clk-provider.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/printk.h>
@@ -355,6 +357,7 @@ struct msdc_host {
 	u32 src_clk_freq;	/* source clock */
 	u32 clocks_enabled;
 	bool quiesced;
+	int dma_error;
 	u32 mclk;		/* mmc framework required bus clock */
 	u32 sclk;		/* actual calculated bus clock */
 
@@ -798,12 +801,36 @@ static void msdc_dma_stop(struct msdc_host *host)
 			   !(reg & MSDC_DMA_CFG_STS), 1000000);
 }
 
+static int mt6577_dma_stop(struct msdc_host *host)
+{
+	struct clk *clock;
+	u32 reg;
+	int ret;
+
+	setbits_le32(&host->base->dma_ctrl, MSDC_DMA_CTRL_STOP);
+	ret = readl_poll_timeout(&host->base->dma_cfg, reg,
+				 !(reg & MSDC_DMA_CFG_STS), 20000);
+	if (!ret)
+		return 0;
+
+	host->dma_error = ret;
+	if (clk_get_by_id(host->src_clk.id, &clock) ||
+	    clock->enable_count != 1 || (clock->flags & CLK_IS_CRITICAL) ||
+	    clk_disable(&host->src_clk))
+		hang();
+	host->clocks_enabled &= ~BIT(0);
+	host->quiesced = true;
+	return ret;
+}
+
 static int msdc_dma_done(struct msdc_host *host, int events)
 {
 	int ret = 0;
 	u32 rawcmd, arg;
 
-	if (!(events & MSDC_INT_XFER_COMPL)) {
+	if (!(events & MSDC_INT_XFER_COMPL) ||
+	    (host->dev_comp->mt6577 &&
+	     (events & (MSDC_INT_DATTMO | MSDC_INT_DATCRCERR)))) {
 		rawcmd = readl(&host->base->sdc_cmd);
 		arg = readl(&host->base->sdc_arg);
 
@@ -849,7 +876,13 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 	if (ret)
 		status = MSDC_INT_DATTMO;
 
-	msdc_dma_stop(host);
+	if (host->dev_comp->mt6577) {
+		ret = mt6577_dma_stop(host);
+		if (ret)
+			return ret;
+	} else {
+		msdc_dma_stop(host);
+	}
 
 	/*
 	 * Need invalidate the dcache again to avoid any
@@ -873,7 +906,7 @@ static int msdc_start_data(struct msdc_host *host, struct mmc_data *data)
 	else
 		ret = msdc_pio_transfer(host, data);
 
-	if (ret) {
+	if (ret && !host->dma_error) {
 		msdc_reset_hw(host);
 		msdc_fifo_clr(host);
 	}
@@ -886,6 +919,9 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 {
 	struct msdc_host *host = dev_get_priv(dev);
 	int cmd_ret, data_ret;
+
+	if (host->dma_error)
+		return host->dma_error;
 
 	cmd_ret = msdc_start_command(host, cmd, data);
 	if (cmd_ret &&
@@ -1080,6 +1116,9 @@ static int msdc_ops_set_ios(struct udevice *dev)
 	struct msdc_host *host = dev_get_priv(dev);
 	struct mmc *mmc = &plat->mmc;
 	uint clock = mmc->clock;
+
+	if (host->dma_error)
+		return host->dma_error;
 
 	msdc_set_buswidth(host, mmc->bus_width);
 
@@ -1887,6 +1926,7 @@ static int msdc_drv_probe(struct udevice *dev)
 		msdc_init_hw(host);
 	}
 	host->quiesced = false;
+	host->dma_error = 0;
 
 	upriv->mmc = &plat->mmc;
 
