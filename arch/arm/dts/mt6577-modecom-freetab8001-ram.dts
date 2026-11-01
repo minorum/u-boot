@@ -37,6 +37,8 @@
 	dpi@c208c000 {
 		compatible = "mediatek,mt6577-dpi";
 		reg = <0xc208c000 0xb8>;
+		interrupt-parent = <&sysirq>;
+		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_LOW>;
 		clocks = <&mmsys CLK_MT6577_MM_DPI>,
 			 <&mmsys CLK_MT6577_MM_LARB1>,
 			 <&mmsys CLK_MT6577_MM_LARB1_EMI>, <&mipi_tx>;
