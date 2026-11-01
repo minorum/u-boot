@@ -94,6 +94,7 @@
 #define SDC_RX_ENHANCE_EN		BIT(20)
 
 /* MSDC_DMA_CTRL */
+#define MT6577_DMA_CTRL_SIZE		GENMASK(31, 16)
 #define MSDC_DMA_CTRL_BURSTSZ		GENMASK(14, 12)
 #define MSDC_DMA_CTRL_LASTBUF		BIT(10)
 #define MSDC_DMA_CTRL_MODE		BIT(8)
@@ -764,6 +765,14 @@ static dma_addr_t msdc_flush_membuf(const void *ptr, size_t size, enum dma_data_
 static void msdc_dma_start(struct msdc_host *host, dma_addr_t addr, u32 size)
 {
 	writel((u32)addr, &host->base->dma_sa);
+	if (host->dev_comp->mt6577) {
+		writel(FIELD_PREP(MT6577_DMA_CTRL_SIZE, size) |
+		       FIELD_PREP(MSDC_DMA_CTRL_BURSTSZ, 6) |
+		       MSDC_DMA_CTRL_LASTBUF | MSDC_DMA_CTRL_START,
+		       &host->base->dma_ctrl);
+		return;
+	}
+
 	clrsetbits_le32(&host->base->dma_ctrl, MSDC_DMA_CTRL_BURSTSZ,
 			FIELD_PREP(MSDC_DMA_CTRL_BURSTSZ, 6));
 
