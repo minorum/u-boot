@@ -22,6 +22,7 @@ struct mt6329_adc_priv {
 	int saved_bias;
 	bool restore_pending;
 	bool restore_temperature;
+	bool busy;
 };
 
 static int mt6329_adc_read_once(struct udevice *dev, unsigned int channel,
@@ -84,7 +85,7 @@ static int mt6329_adc_restore(struct udevice *dev)
 	return ret;
 }
 
-static int mt6329_adc_start_channel(struct udevice *dev, int channel)
+static int mt6329_adc_sample(struct udevice *dev, int channel)
 {
 	struct mt6329_adc_priv *priv = dev_get_priv(dev);
 	struct udevice *pmic = dev->parent;
@@ -146,11 +147,26 @@ restore:
 	return 0;
 }
 
+static int mt6329_adc_start_channel(struct udevice *dev, int channel)
+{
+	struct mt6329_adc_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	if (priv->busy)
+		return -EBUSY;
+	priv->busy = true;
+	ret = mt6329_adc_sample(dev, channel);
+	priv->busy = false;
+	return ret;
+}
+
 static int mt6329_adc_channel_data(struct udevice *dev, int channel,
 				   unsigned int *data)
 {
 	struct mt6329_adc_priv *priv = dev_get_priv(dev);
 
+	if (priv->busy)
+		return -EBUSY;
 	if (channel != priv->channel || priv->channel < 0)
 		return -ENODATA;
 	*data = priv->value;
@@ -179,10 +195,15 @@ static int mt6329_adc_channel_raw_to_uV(struct udevice *dev, int channel,
 static int mt6329_adc_stop(struct udevice *dev)
 {
 	struct mt6329_adc_priv *priv = dev_get_priv(dev);
+	int ret;
 
+	if (priv->busy)
+		return -EBUSY;
+	priv->busy = true;
 	priv->channel = -1;
-
-	return mt6329_adc_restore(dev);
+	ret = mt6329_adc_restore(dev);
+	priv->busy = false;
+	return ret;
 }
 
 static int mt6329_adc_probe(struct udevice *dev)
