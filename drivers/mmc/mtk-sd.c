@@ -1078,6 +1078,10 @@ static int msdc_set_mclk(struct udevice *dev,
 	u32 reg;
 	int ret;
 
+	if (host->dev_comp->mt6577 &&
+	    ((timing != MMC_LEGACY && timing != MMC_HS && timing != MMC_HS_52) ||
+	     hz > 52000000))
+		return -EINVAL;
 	if (host->dev_comp->mt6577 && host->dma_disabled)
 		hz = min(hz, 12000000U);
 
@@ -1197,6 +1201,11 @@ static int msdc_ops_set_ios(struct udevice *dev)
 
 	if (host->dma_error)
 		return host->dma_error;
+
+	if (host->dev_comp->mt6577 &&
+	    mmc->signal_voltage != MMC_SIGNAL_VOLTAGE_000 &&
+	    mmc->signal_voltage != MMC_SIGNAL_VOLTAGE_330)
+		return -EINVAL;
 
 	msdc_set_buswidth(host, mmc->bus_width);
 
