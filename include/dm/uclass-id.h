@@ -50,6 +50,7 @@ enum uclass_id {
 	UCLASS_BOOTSTD,		/* Standard boot driver */
 	UCLASS_BUTTON,		/* Button */
 	UCLASS_CACHE,		/* Cache controller */
+	UCLASS_CHARGER,		/* Battery charger */
 	UCLASS_CLK,		/* Clock source, e.g. used by peripherals */
 	UCLASS_CPU,		/* CPU, typically part of an SoC */
 	UCLASS_CROS_EC,		/* Chrome OS EC */

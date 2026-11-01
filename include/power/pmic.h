@@ -35,7 +35,7 @@ enum { PMIC_I2C, PMIC_SPI, PMIC_NONE};
  * |_ BUS 0 device (e.g. I2C0)                 - UCLASS_I2C/SPI/...
  * | |_ PMIC device (READ/WRITE ops)           - UCLASS_PMIC
  * |   |_ REGULATOR device (ldo/buck/... ops)  - UCLASS_REGULATOR
- * |   |_ CHARGER device (charger ops)         - UCLASS_CHARGER (in the future)
+ * |   |_ CHARGER device (charger ops)         - UCLASS_CHARGER
  * |   |_ MUIC device (microUSB connector ops) - UCLASS_MUIC    (in the future)
  * |   |_ ...
  * |

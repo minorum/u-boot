@@ -1,0 +1,8 @@
+config DM_CHARGER
+	bool "Driver model battery chargers"
+	depends on DM
+	help
+	  Provide charger status and input-current authorization through driver
+	  model. Current budgets use microamps and include zero authorization.
+	  Battery measurements and protections remain with the chip driver.
+	  This interface does not infer battery limits or available USB current.
