@@ -20,11 +20,11 @@ config MMC_WRITE
 	  Enable write access to MMC and SD Cards
 
 config MMC_PWRSEQ
-	bool "HW reset support for eMMC"
+	bool "MMC power sequencing"
 	depends on PWRSEQ && DM_GPIO
 	help
-	  This select Hardware reset support aka pwrseq-emmc for eMMC
-	  devices.
+	  Enable MMC power-sequence lookup and the eMMC hardware-reset
+	  power-sequence provider.
 
 config SPL_MMC_PWRSEQ
 	bool "HW reset support for eMMC in SPL"
@@ -39,6 +39,7 @@ config PWRSEQ_MT6628
 	depends on DM_MMC && DM_SERIAL && SERIAL_PRESENT && DM_GPIO
 	depends on PINCTRL && CLK && PWRSEQ && FS_LOADER && OF_CONTROL
 	select CRC16
+	select MMC_PWRSEQ
 	help
 	  Bootstrap the MT6628 combo chip over its UART management transport
 	  before enabling the WLAN SDIO function. Firmware is loaded through
