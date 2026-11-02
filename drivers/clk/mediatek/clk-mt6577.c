@@ -16,6 +16,7 @@ enum mt6577_clock_type {
 	MT6577_MAINPLL,
 	MT6577_AXI,
 	MT6577_MSDC_SEL,
+	MT6577_MSDC3_SEL,
 	MT6577_USB_SEL,
 	MT6577_WPLL197,
 	MT6577_WPLL61,
@@ -31,7 +32,7 @@ struct mt6577_clock {
 
 struct mt6577_clk_priv {
 	void __iomem *base;
-	struct clk *clocks[6];
+	struct clk *clocks[8];
 	unsigned int count;
 };
 
@@ -56,6 +57,8 @@ static u32 mt6577_clock_source(struct mt6577_clock *clock)
 		return value == 3 ? 1 : value;
 	}
 	value = readl(clock->base + 0x0c);
+	if (clock->type == MT6577_MSDC3_SEL)
+		return (value >> 7) & 3;
 	return clock->type == MT6577_MSDC_SEL ? value & 3 : !!(value & BIT(2));
 }
 
@@ -73,7 +76,8 @@ static ulong mt6577_clock_rate(struct clk *clk)
 	if (clock->type != MT6577_MAINPLL &&
 	    mt6577_clock_source(clock) != clock->source)
 		return 0;
-	if ((clock->type == MT6577_MSDC_SEL && clock->source > 1) ||
+	if (((clock->type == MT6577_MSDC_SEL || clock->type == MT6577_MSDC3_SEL) &&
+	     clock->source > 1) ||
 	    (clock->type == MT6577_USB_SEL && clock->source))
 		return 0;
 	parent = clk_get_parent_rate(clk);
@@ -140,7 +144,8 @@ static struct clk *mt6577_register_clock(struct udevice *dev, const char *name,
 	clock->base = priv->base;
 	clock->type = type;
 	clock->clk.flags = flags | CLK_GET_RATE_NOCACHE;
-	if (type == MT6577_AXI || type == MT6577_MSDC_SEL || type == MT6577_USB_SEL)
+	if (type == MT6577_AXI || type == MT6577_MSDC_SEL ||
+	    type == MT6577_MSDC3_SEL || type == MT6577_USB_SEL)
 		clock->source = mt6577_clock_source(clock);
 	ret = clk_register(&clock->clk, "mt6577_clock", name, parent);
 	if (ret) {
@@ -255,6 +260,18 @@ static int mt6577_clock_probe(struct udevice *dev)
 		clock = clk_register_gate(dev, "mt6577_msdc0", "mt6577_msdc_sel", 0,
 					  priv->base + 0x10, 15, CLK_GATE_SET_TO_DISABLE, NULL);
 		ret = mt6577_keep_clock(dev, clock, CLK_MT6577_MSDC0);
+		if (ret)
+			goto fail;
+		source = (readl(priv->base + 0x0c) >> 7) & 3;
+		clock = mt6577_register_clock(dev, "mt6577_msdc3_sel",
+					      source < 2 ? parents[source + 1] : NULL,
+					      MT6577_MSDC3_SEL, 0);
+		ret = mt6577_keep_clock(dev, clock, -1);
+		if (ret)
+			goto fail;
+		clock = clk_register_gate(dev, "mt6577_msdc3", "mt6577_msdc3_sel", 0,
+					  priv->base + 0x10, 18, CLK_GATE_SET_TO_DISABLE, NULL);
+		ret = mt6577_keep_clock(dev, clock, CLK_MT6577_MSDC3);
 		if (ret)
 			goto fail;
 		source = readl(priv->base + 0x0c) & BIT(2);
