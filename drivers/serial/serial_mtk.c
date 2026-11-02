@@ -59,7 +59,7 @@ struct mtk_serial_regs {
 
 #define UART_LSR_DR	0x01		/* Data ready */
 #define UART_LSR_THRE	0x20		/* Xmit holding register empty */
-#define UART_LSR_TEMT	0x40		/* Xmitter empty */
+#define UART_LSR_THRE	0x40		/* Xmitter empty */
 
 #define UART_MCR_DTR	0x01		/* DTR   */
 #define UART_MCR_RTS	0x02		/* RTS   */
@@ -97,6 +97,8 @@ struct mtk_serial_priv {
 	u32 fixed_clk_rate;
 	bool force_highspeed;
 	bool upstream_highspeed_logic;
+	bool clk_enabled;
+	bool bus_clk_enabled;
 };
 
 static const unsigned short fraction_l_mapping[] = {
@@ -212,7 +214,7 @@ static int _mtk_serial_pending(struct mtk_serial_priv *priv, bool input)
 #if CONFIG_IS_ENABLED(DM_SERIAL)
 static int mtk_serial_setbrg(struct udevice *dev, int baudrate)
 {
-	struct mtk_serial_priv *priv = dev_get_priv(dev);
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
 	u32 clk_rate;
 
 	clk_rate = clk_get_rate(&priv->clk);
@@ -226,47 +228,90 @@ static int mtk_serial_setbrg(struct udevice *dev, int baudrate)
 
 static int mtk_serial_putc(struct udevice *dev, const char ch)
 {
-	struct mtk_serial_priv *priv = dev_get_priv(dev);
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
 
 	return _mtk_serial_putc(priv, ch);
 }
 
 static int mtk_serial_getc(struct udevice *dev)
 {
-	struct mtk_serial_priv *priv = dev_get_priv(dev);
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
 
 	return _mtk_serial_getc(priv);
 }
 
 static int mtk_serial_pending(struct udevice *dev, bool input)
 {
-	struct mtk_serial_priv *priv = dev_get_priv(dev);
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
 
 	return _mtk_serial_pending(priv, input);
 }
 
+static int mtk_serial_disable_clocks(struct mtk_serial_priv *priv)
+{
+	int ret = 0, err;
+
+	if (priv->bus_clk_enabled) {
+		ret = clk_disable(&priv->clk_bus);
+		if (!ret)
+			priv->bus_clk_enabled = false;
+	}
+	if (priv->clk_enabled) {
+		err = clk_disable(&priv->clk);
+		if (!err)
+			priv->clk_enabled = false;
+		if (!ret)
+			ret = err;
+	}
+	return ret;
+}
+
+static int mtk_serial_remove(struct udevice *dev)
+{
+	return mtk_serial_disable_clocks(dev_get_plat(dev));
+}
+
 static int mtk_serial_probe(struct udevice *dev)
 {
-	struct mtk_serial_priv *priv = dev_get_priv(dev);
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
+	int ret;
 
-	/* Disable interrupt */
+	if (priv->clk.dev) {
+		ret = clk_enable(&priv->clk);
+		if (ret)
+			return ret;
+		priv->clk_enabled = true;
+	}
+	if (priv->clk_bus.dev) {
+		ret = clk_enable(&priv->clk_bus);
+		if (ret) {
+			if (mtk_serial_disable_clocks(priv))
+				dev_err(dev, "clock unwind failed\n");
+			return ret;
+		}
+		priv->bus_clk_enabled = true;
+	}
+
+	writel(UART_LCR_WLS_8, &priv->regs->lcr);
 	writel(0, &priv->regs->ier);
 
 	writel(UART_MCRVAL, &priv->regs->mcr);
 	writel(UART_FCRVAL, &priv->regs->fcr);
-
-	clk_enable(&priv->clk);
-	if (priv->clk_bus.dev)
-		clk_enable(&priv->clk_bus);
 
 	return 0;
 }
 
 static int mtk_serial_of_to_plat(struct udevice *dev)
 {
-	struct mtk_serial_priv *priv = dev_get_priv(dev);
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
 	fdt_addr_t addr;
+	ulong rate;
 	int err;
+
+	err = mtk_serial_disable_clocks(priv);
+	if (err)
+		return err;
+	memset(priv, 0, sizeof(*priv));
 
 	addr = dev_read_addr(dev);
 	if (addr == FDT_ADDR_T_NONE)
@@ -276,20 +321,25 @@ static int mtk_serial_of_to_plat(struct udevice *dev)
 
 	err = clk_get_by_index(dev, 0, &priv->clk);
 	if (err) {
+		priv->clk.dev = NULL;
 		err = dev_read_u32(dev, "clock-frequency", &priv->fixed_clk_rate);
-		if (err) {
+		if (err || !priv->fixed_clk_rate) {
 			dev_err(dev, "baud clock not defined\n");
 			return -EINVAL;
 		}
 	} else {
-		err = clk_get_rate(&priv->clk);
-		if (IS_ERR_VALUE(err)) {
+		rate = clk_get_rate(&priv->clk);
+		if (IS_ERR_VALUE(rate) || !rate) {
 			dev_err(dev, "invalid baud clock\n");
 			return -EINVAL;
 		}
 	}
 
-	clk_get_by_name(dev, "bus", &priv->clk_bus);
+	if (CONFIG_IS_ENABLED(CLK)) {
+		err = clk_get_by_name_optional(dev, "bus", &priv->clk_bus);
+		if (err)
+			return err;
+	}
 
 	priv->force_highspeed = dev_read_bool(dev, "mediatek,force-highspeed");
 	priv->upstream_highspeed_logic =
@@ -316,8 +366,10 @@ U_BOOT_DRIVER(serial_mtk) = {
 	.id = UCLASS_SERIAL,
 	.of_match = mtk_serial_ids,
 	.of_to_plat = mtk_serial_of_to_plat,
-	.priv_auto	= sizeof(struct mtk_serial_priv),
+	.plat_auto	= sizeof(struct mtk_serial_priv),
 	.probe = mtk_serial_probe,
+	.remove = mtk_serial_remove,
+	.unbind = mtk_serial_remove,
 	.ops = &mtk_serial_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
