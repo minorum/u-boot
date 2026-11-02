@@ -18,6 +18,16 @@
 		i2c1 = &charger_i2c;
 	};
 
+	battery: battery {
+		compatible = "simple-battery";
+		constant-charge-current-max-microamp = <500000>;
+		constant-charge-voltage-max-microvolt = <4200000>;
+		precharge-current-microamp = <100000>;
+		charge-term-current-microamp = <200000>;
+		over-voltage-threshold-microvolt = <4350000>;
+		alert-celsius = <10 40>;
+	};
+
 	battery_thermistor: battery-thermistor {
 		compatible = "generic-adc-thermal";
 		#thermal-sensor-cells = <0>;
@@ -173,6 +183,19 @@
 		clock-frequency = <100000>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+
+		charger: charger@36 {
+			compatible = "onnn,ncp1851";
+			reg = <0x36>;
+			monitored-battery = <&battery>;
+			io-channels = <&pmic_adc MT6329_AUXADC_ISENSE>,
+				      <&battery_thermistor>;
+			io-channel-names = "voltage", "temperature";
+			input-current-limit-microamp = <500000>;
+			shunt-resistor-micro-ohms = <68000>;
+			onnn,power-path;
+			onnn,system-voltage-microvolt = <3400000>;
+		};
 	};
 
 	pmic_i2c: i2c@c1014000 {
@@ -260,5 +283,6 @@
 		phys = <&usb_phy>;
 		phy-names = "usb2-phy";
 		dr_mode = "peripheral";
+		power-supplies = <&charger>;
 	};
 };
