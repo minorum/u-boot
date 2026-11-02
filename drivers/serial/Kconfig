@@ -39,11 +39,23 @@ config DEFAULT_ENV_IS_RW
 	  Select this to enable to make default environment writable. This
 	  allows modifying the default environment.
 
+config SERIAL_CONSOLE
+	bool "Use UART devices for the console"
+	depends on DM_SERIAL
+	default y
+	help
+	  Allow UART selection, console baud setup and serial stdio devices.
+	  Disable this when UARTs serve attached peripherals and another
+	  device provides the console. The serial device class and its direct
+	  operations remain available when SERIAL_PRESENT is enabled.
+	  This applies to all boot phases using driver-model serial.
+	  Direct debug-UART output is controlled separately.
+
 config REQUIRE_SERIAL_CONSOLE
 	bool "Require a serial port for console"
 	# Running without a serial console is not supported by the
 	# non-dm serial code
-	depends on DM_SERIAL
+	depends on DM_SERIAL && SERIAL_CONSOLE
 	default y
 	help
 	  Require a serial port for the console, and panic if none is found

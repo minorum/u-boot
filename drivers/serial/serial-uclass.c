@@ -28,7 +28,7 @@ DECLARE_GLOBAL_DATA_PTR;
  */
 static const unsigned long baudrate_table[] = CFG_SYS_BAUDRATE_TABLE;
 
-#if CONFIG_IS_ENABLED(SERIAL_PRESENT)
+#if CONFIG_IS_ENABLED(SERIAL_PRESENT) && IS_ENABLED(CONFIG_SERIAL_CONSOLE)
 static int serial_check_stdout(const void *blob, struct udevice **devp)
 {
 	int node = -1;
@@ -189,7 +189,7 @@ int fetch_baud_from_dtb(void)
 /* Called prior to relocation */
 int serial_init(void)
 {
-#if CONFIG_IS_ENABLED(SERIAL_PRESENT)
+#if CONFIG_IS_ENABLED(SERIAL_PRESENT) && IS_ENABLED(CONFIG_SERIAL_CONSOLE)
 	/*
 	 * Skip serial device probe before relocation if debug UART is enabled
 	 * and early DM is skipped. Debug UART will handle console output during
@@ -476,7 +476,7 @@ void serial_stdio_init(void)
 
 #if CONFIG_IS_ENABLED(DM_STDIO)
 
-#if CONFIG_IS_ENABLED(SERIAL_PRESENT)
+#if CONFIG_IS_ENABLED(SERIAL_PRESENT) && IS_ENABLED(CONFIG_SERIAL_CONSOLE)
 static void serial_stub_putc(struct stdio_dev *sdev, const char ch)
 {
 	_serial_putc(sdev->priv, ch);
@@ -569,6 +569,7 @@ static int on_baudrate(const char *name, const char *value, enum env_op op,
 U_BOOT_ENV_CALLBACK(baudrate, on_baudrate);
 
 #if CONFIG_IS_ENABLED(SERIAL_PRESENT)
+#if IS_ENABLED(CONFIG_SERIAL_CONSOLE)
 static int serial_post_probe(struct udevice *dev)
 {
 	struct dm_serial_ops *ops = serial_get_ops(dev);
@@ -615,13 +616,16 @@ static int serial_pre_remove(struct udevice *dev)
 
 	return 0;
 }
+#endif
 
 UCLASS_DRIVER(serial) = {
 	.id		= UCLASS_SERIAL,
 	.name		= "serial",
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
+#if IS_ENABLED(CONFIG_SERIAL_CONSOLE)
 	.post_probe	= serial_post_probe,
 	.pre_remove	= serial_pre_remove,
+#endif
 	.per_device_auto	= sizeof(struct serial_dev_priv),
 };
 #endif
