@@ -619,7 +619,7 @@ static void msdc_fifo_read(struct msdc_host *host, u8 *buf, u32 size)
 {
 	u32 *wbuf;
 
-	while ((size_t)buf % 4) {
+	while (size && (size_t)buf % 4) {
 		*buf++ = readb(&host->base->msdc_rxdata);
 		size--;
 	}
@@ -641,7 +641,7 @@ static void msdc_fifo_write(struct msdc_host *host, const u8 *buf, u32 size)
 {
 	const u32 *wbuf;
 
-	while ((size_t)buf % 4) {
+	while (size && (size_t)buf % 4) {
 		writeb(*buf++, &host->base->msdc_txdata);
 		size--;
 	}
