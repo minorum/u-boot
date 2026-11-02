@@ -11,6 +11,7 @@
 #include <linux/bitfield.h>
 #include <linux/clk-provider.h>
 #include <linux/delay.h>
+#include <linux/iopoll.h>
 
 enum mt6577_clock_type {
 	MT6577_MAINPLL,
@@ -321,4 +322,123 @@ U_BOOT_DRIVER(mt6577_clock_provider) = {
 	.probe = mt6577_clock_probe,
 	.ops = &mt6577_provider_ops,
 	.priv_auto = sizeof(struct mt6577_clk_priv),
+};
+
+struct mt6577_rtc_clock {
+	void __iomem *base;
+	unsigned int enable_count;
+	bool busy;
+};
+
+static int mt6577_rtc_wait(struct mt6577_rtc_clock *rtc)
+{
+	u16 value;
+
+	return read_poll_timeout(readw, value, !(value & BIT(6)), 10, 1000000, rtc->base);
+}
+
+static int mt6577_rtc_write(struct mt6577_rtc_clock *rtc, u32 reg, u16 value)
+{
+	writew(value, rtc->base + reg);
+	writew(1, rtc->base + 0x74);
+	return mt6577_rtc_wait(rtc);
+}
+
+static int mt6577_rtc_set_clock(struct clk *clk, bool enable)
+{
+	struct mt6577_rtc_clock *rtc = dev_get_priv(clk->dev);
+	u16 value;
+	int ret;
+
+	if (rtc->busy)
+		return -EBUSY;
+	rtc->busy = true;
+	ret = mt6577_rtc_wait(rtc);
+	if (ret)
+		goto out;
+	ret = mt6577_rtc_write(rtc, 0x68, 0x586a);
+	if (ret)
+		goto out;
+	ret = mt6577_rtc_write(rtc, 0x68, 0x9136);
+	if (ret)
+		goto out;
+	if (!enable && (readw(rtc->base + 0x58) & GENMASK(12, 8)))
+		goto out;
+	value = readw(rtc->base + 0x78);
+	value = enable ? value & ~BIT(5) : value | BIT(5);
+	ret = mt6577_rtc_write(rtc, 0x78, value);
+out:
+	rtc->busy = false;
+	return ret;
+}
+
+static int mt6577_rtc_enable(struct clk *clk)
+{
+	struct mt6577_rtc_clock *rtc = dev_get_priv(clk->dev);
+	int ret = 0;
+
+	if (rtc->busy)
+		return -EBUSY;
+	if (rtc->enable_count == ~0U)
+		return -EOVERFLOW;
+	if (!rtc->enable_count)
+		ret = mt6577_rtc_set_clock(clk, true);
+	if (!ret)
+		rtc->enable_count++;
+	return ret;
+}
+
+static int mt6577_rtc_disable(struct clk *clk)
+{
+	struct mt6577_rtc_clock *rtc = dev_get_priv(clk->dev);
+	int ret = 0;
+
+	if (rtc->busy)
+		return -EBUSY;
+	if (!rtc->enable_count)
+		return 0;
+	if (rtc->enable_count == 1)
+		ret = mt6577_rtc_set_clock(clk, false);
+	if (!ret)
+		rtc->enable_count--;
+	return ret;
+}
+
+static ulong mt6577_rtc_rate(struct clk *clk)
+{
+	return 32768;
+}
+
+static int mt6577_rtc_request(struct clk *clk)
+{
+	return clk->id ? -EINVAL : 0;
+}
+
+static const struct clk_ops mt6577_rtc_ops = {
+	.request = mt6577_rtc_request,
+	.get_rate = mt6577_rtc_rate,
+	.enable = mt6577_rtc_enable,
+	.disable = mt6577_rtc_disable,
+};
+
+static int mt6577_rtc_probe(struct udevice *dev)
+{
+	struct mt6577_rtc_clock *rtc = dev_get_priv(dev);
+
+	rtc->base = dev_read_addr_ptr(dev);
+	return rtc->base ? 0 : -EINVAL;
+}
+
+static const struct udevice_id mt6577_rtc_ids[] = {
+	{ .compatible = "mediatek,mt6577-pwrc" },
+	{ }
+};
+
+U_BOOT_DRIVER(mt6577_rtc_clock_provider) = {
+	.name = "mt6577_rtc_clock_provider",
+	.id = UCLASS_CLK,
+	.of_match = mt6577_rtc_ids,
+	.probe = mt6577_rtc_probe,
+	.ops = &mt6577_rtc_ops,
+	.priv_auto = sizeof(struct mt6577_rtc_clock),
 };
