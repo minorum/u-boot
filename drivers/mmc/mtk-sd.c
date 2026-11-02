@@ -14,6 +14,7 @@
 #include <hang.h>
 #include <malloc.h>
 #include <mapmem.h>
+#include <pwrseq.h>
 #include <stdbool.h>
 #include <asm/cache.h>
 #include <asm/gpio.h>
@@ -333,6 +334,12 @@ struct msdc_delay_phase {
 struct msdc_plat {
 	struct mmc_config cfg;
 	struct mmc mmc;
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	bool power_required;
+	bool power_busy;
+	bool power_ready;
+	int power_error;
+#endif
 };
 
 struct msdc_tune_para {
@@ -398,6 +405,83 @@ struct msdc_host {
 
 static int msdc_set_mclk(struct udevice *dev, struct msdc_host *host,
 			 enum bus_mode timing, u32 hz);
+
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+static int msdc_pwrseq_status(struct udevice *dev, bool require_power)
+{
+	struct msdc_plat *plat = dev_get_plat(dev);
+
+	if (plat->power_busy)
+		return -EBUSY;
+	if (require_power && plat->power_required && !plat->power_ready)
+		return plat->power_error ? plat->power_error : -EHOSTDOWN;
+	return 0;
+}
+
+static int msdc_pwrseq_set_power(struct udevice *dev, bool enable)
+{
+	struct msdc_plat *plat = dev_get_plat(dev);
+	int ret = 0;
+
+	if (!plat->power_required)
+		return 0;
+	if (plat->power_busy)
+		return -EBUSY;
+	plat->power_busy = true;
+	plat->power_ready = false;
+	if (!enable) {
+		plat->mmc.has_init = false;
+		plat->mmc.init_in_progress = false;
+	} else {
+		ret = mmc_pwrseq_get_power(dev, &plat->cfg);
+	}
+	if (!ret && plat->cfg.pwr_dev)
+		ret = pwrseq_set_power(plat->cfg.pwr_dev, enable);
+	if (!ret)
+		plat->power_ready = enable;
+	plat->power_error = ret;
+	plat->power_busy = false;
+	return ret;
+}
+
+static int msdc_ops_reinit(struct udevice *dev)
+{
+	struct msdc_plat *plat = dev_get_plat(dev);
+	struct msdc_host *host = dev_get_priv(dev);
+	int ret;
+
+	if (host->dma_error)
+		return host->dma_error;
+	ret = msdc_pwrseq_status(dev, false);
+	if (ret)
+		return ret;
+	if (plat->power_error)
+		return plat->power_error;
+	if (!plat->power_required || plat->power_ready)
+		return 0;
+	return msdc_pwrseq_set_power(dev, true);
+}
+
+static int msdc_ops_power_cycle(struct udevice *dev)
+{
+	struct msdc_plat *plat = dev_get_plat(dev);
+	struct msdc_host *host = dev_get_priv(dev);
+	int ret;
+
+	ret = msdc_pwrseq_status(dev, false);
+	if (ret || !plat->power_required)
+		return ret;
+	if (host->dma_error)
+		return host->dma_error;
+	ret = msdc_set_mclk(dev, host, MMC_LEGACY, 0);
+	if (ret)
+		return ret;
+	ret = msdc_pwrseq_set_power(dev, false);
+	if (ret)
+		return ret;
+	return msdc_pwrseq_set_power(dev, true);
+}
+#endif
 
 static int msdc_reset_hw(struct msdc_host *host)
 {
@@ -1002,6 +1086,11 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	struct msdc_host *host = dev_get_priv(dev);
 	int cmd_ret, data_ret;
 
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	cmd_ret = msdc_pwrseq_status(dev, true);
+	if (cmd_ret)
+		return cmd_ret;
+#endif
 	if (host->dma_error)
 		return host->dma_error;
 
@@ -1217,6 +1306,12 @@ static int msdc_ops_set_ios(struct udevice *dev)
 	struct mmc *mmc = &plat->mmc;
 	uint clock = mmc->clock;
 
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	int ret = msdc_pwrseq_status(dev, !mmc->clk_disable);
+
+	if (ret)
+		return ret;
+#endif
 	if (host->dma_error)
 		return host->dma_error;
 
@@ -2036,6 +2131,14 @@ static int msdc_drv_probe(struct udevice *dev)
 	host->dma_error = 0;
 	host->dma_disabled = false;
 
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	plat->power_required = dev_read_bool(dev, "mmc-pwrseq");
+	plat->power_ready = false;
+	plat->power_error = 0;
+	plat->cfg.pwr_dev = NULL;
+	plat->mmc.has_init = false;
+	plat->mmc.init_in_progress = false;
+#endif
 	upriv->mmc = &plat->mmc;
 
 	return 0;
@@ -2049,6 +2152,11 @@ static int msdc_drv_remove(struct udevice *dev)
 	struct msdc_host *host = dev_get_priv(dev);
 	int ret;
 
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	ret = msdc_pwrseq_status(dev, false);
+	if (ret)
+		return ret;
+#endif
 	if (!host->quiesced) {
 		writel(0, &host->base->msdc_inten);
 		ret = msdc_set_mclk(dev, host, MMC_LEGACY, 0);
@@ -2056,6 +2164,11 @@ static int msdc_drv_remove(struct udevice *dev)
 			return ret;
 		host->quiesced = true;
 	}
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	ret = msdc_pwrseq_set_power(dev, false);
+	if (ret)
+		return ret;
+#endif
 	ret = msdc_set_clocks(host, false);
 	if (!ret) {
 		free(host->dma_buffer);
@@ -2152,6 +2265,10 @@ static int msdc_ops_wait_dat0(struct udevice *dev, int state, int timeout_us)
 }
 
 static const struct dm_mmc_ops msdc_ops = {
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
+	.reinit = msdc_ops_reinit,
+	.host_power_cycle = msdc_ops_power_cycle,
+#endif
 	.send_cmd = msdc_ops_send_cmd,
 	.set_ios = msdc_ops_set_ios,
 	.get_cd = msdc_ops_get_cd,
