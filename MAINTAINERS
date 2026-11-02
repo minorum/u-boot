@@ -1283,6 +1283,11 @@ F:	drivers/adc/mt6329-adc.c
 F:	drivers/power/pmic/mt6329.c
 F:	include/dt-bindings/iio/adc/mediatek,mt6329-auxadc.h
 
+MEDIATEK MT6628 WMT POWER SEQUENCE
+M:	Michal Andrzejczak <mit.mis@gmail.com>
+S:	Maintained
+F:	drivers/mmc/pwrseq_mt6628.c
+
 MEMBUF
 M:	Simon Glass <sjg@chromium.org>
 S:	Maintained

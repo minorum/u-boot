@@ -34,6 +34,17 @@ config SPL_MMC_PWRSEQ
 	  This select Hardware reset support aka pwrseq-emmc for eMMC
 	  devices in SPL.
 
+config PWRSEQ_MT6628
+	bool "MediaTek MT6628 WMT power sequencing"
+	depends on DM_MMC && DM_SERIAL && SERIAL_PRESENT && DM_GPIO
+	depends on PINCTRL && CLK && PWRSEQ && FS_LOADER && OF_CONTROL
+	select CRC16
+	help
+	  Bootstrap the MT6628 combo chip over its UART management transport
+	  before enabling the WLAN SDIO function. Firmware is loaded through
+	  the standard filesystem loader. Bluetooth and WLAN data paths are
+	  separate drivers.
+
 config MMC_BROKEN_CD
 	bool "Poll for broken card detection case"
 	help

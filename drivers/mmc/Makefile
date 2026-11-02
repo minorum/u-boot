@@ -12,6 +12,7 @@ endif
 
 obj-$(CONFIG_$(PHASE_)MMC_WRITE) += mmc_write.o
 obj-$(CONFIG_$(PHASE_)MMC_PWRSEQ) += mmc-pwrseq.o
+obj-$(CONFIG_$(PHASE_)PWRSEQ_MT6628) += pwrseq_mt6628.o
 obj-$(CONFIG_MMC_SDHCI_ADMA_HELPERS) += sdhci-adma.o
 
 ifndef CONFIG_$(PHASE_)BLK
