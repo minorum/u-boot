@@ -60,7 +60,7 @@ struct mtk_serial_regs {
 
 #define UART_LSR_DR	0x01		/* Data ready */
 #define UART_LSR_THRE	0x20		/* Xmit holding register empty */
-#define UART_LSR_THRE	0x40		/* Xmitter empty */
+#define UART_LSR_TEMT	0x40		/* Xmitter empty */
 
 #define UART_MCR_DTR	0x01		/* DTR   */
 #define UART_MCR_RTS	0x02		/* RTS   */
@@ -209,7 +209,7 @@ static int _mtk_serial_pending(struct mtk_serial_priv *priv, bool input)
 	if (input)
 		return (readl(&priv->regs->lsr) & UART_LSR_DR) ? 1 : 0;
 	else
-		return (readl(&priv->regs->lsr) & UART_LSR_THRE) ? 0 : 1;
+		return (readl(&priv->regs->lsr) & UART_LSR_TEMT) ? 0 : 1;
 }
 
 #if CONFIG_IS_ENABLED(DM_SERIAL)
@@ -246,6 +246,14 @@ static int mtk_serial_pending(struct udevice *dev, bool input)
 	struct mtk_serial_priv *priv = dev_get_plat(dev);
 
 	return _mtk_serial_pending(priv, input);
+}
+
+static int mtk_serial_clear(struct udevice *dev)
+{
+	struct mtk_serial_priv *priv = dev_get_plat(dev);
+
+	writel(UART_FCRVAL, &priv->regs->fcr);
+	return 0;
 }
 
 static int mtk_serial_disable_clocks(struct mtk_serial_priv *priv)
@@ -354,6 +362,7 @@ static const struct dm_serial_ops mtk_serial_ops = {
 	.pending = mtk_serial_pending,
 	.getc = mtk_serial_getc,
 	.setbrg = mtk_serial_setbrg,
+	.clear = mtk_serial_clear,
 };
 
 static const struct udevice_id mtk_serial_ids[] = {
