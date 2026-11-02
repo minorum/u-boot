@@ -710,9 +710,14 @@ static int msdc_pio_write(struct msdc_host *host, const u8 *ptr, u32 size)
 {
 	u32 status;
 	u32 chksz;
+	ulong start = host->dev_comp->mt6577 ? get_timer(0) : 0;
 	int ret = 0;
 
 	while (1) {
+		if (host->dev_comp->mt6577 && get_timer(start) > 5000) {
+			ret = -ETIMEDOUT;
+			break;
+		}
 		status = readl(&host->base->msdc_int);
 		writel(status, &host->base->msdc_int);
 		status &= DATA_INTS_MASK;
@@ -919,14 +924,14 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 
 static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
 {
-	if (!data->blocksize || data->blocksize > 512 || data->blocksize % 4 ||
+	if (!data->blocksize || data->blocksize > 512 ||
 	    !data->blocks || data->blocks > MT6577_MAX_REQUEST / data->blocksize ||
 	    (data->flags != MMC_DATA_READ && data->flags != MMC_DATA_WRITE) ||
 	    (data->flags == MMC_DATA_READ ? !data->dest : !data->src))
 		return -EINVAL;
 
 	writel(DATA_INTS_MASK, &host->base->msdc_int);
-	if (!host->dev_comp->use_dma_mode || host->dma_disabled) {
+	if (!host->dev_comp->use_dma_mode || host->dma_disabled || data->blocksize % 4) {
 		setbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
 		return 0;
 	}
@@ -944,7 +949,7 @@ static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
 }
 
 static void mt6577_finish_request(struct udevice *dev, struct msdc_host *host,
-				  int error, u32 blocks)
+				  int error, u32 opcode)
 {
 	struct mmc_cmd stop = {
 		.cmdidx = MMC_CMD_STOP_TRANSMISSION,
@@ -957,7 +962,7 @@ static void mt6577_finish_request(struct udevice *dev, struct msdc_host *host,
 	if (!error)
 		return;
 	host->dma_disabled = true;
-	if (blocks > 1) {
+	if (opcode == MMC_CMD_READ_MULTIPLE_BLOCK || opcode == MMC_CMD_WRITE_MULTIPLE_BLOCK) {
 		host->dma_error = msdc_start_command(host, &stop, NULL);
 		if (host->dma_error)
 			return;
@@ -975,7 +980,7 @@ static int msdc_start_data(struct msdc_host *host, struct mmc_data *data)
 		host->last_data_write = 1;
 
 	if (host->dev_comp->use_dma_mode &&
-	    (!host->dev_comp->mt6577 || !host->dma_disabled))
+	    (!host->dev_comp->mt6577 || (!host->dma_disabled && !(data->blocksize % 4))))
 		ret = msdc_dma_transfer(host, data);
 	else
 		ret = msdc_pio_transfer(host, data);
@@ -1012,14 +1017,14 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	    (cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK ||
 	    cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK_HS200))) {
 		if (host->dev_comp->mt6577 && data)
-			mt6577_finish_request(dev, host, cmd_ret, data->blocks);
+			mt6577_finish_request(dev, host, cmd_ret, cmd->cmdidx);
 		return cmd_ret;
 	}
 
 	if (data) {
 		data_ret = msdc_start_data(host, data);
 		if (host->dev_comp->mt6577)
-			mt6577_finish_request(dev, host, data_ret, data->blocks);
+			mt6577_finish_request(dev, host, data_ret, cmd->cmdidx);
 		if (cmd_ret)
 			return cmd_ret;
 		else
@@ -1092,8 +1097,8 @@ static int msdc_set_mclk(struct udevice *dev,
 	int ret;
 
 	if (host->dev_comp->mt6577 &&
-	    ((timing != MMC_LEGACY && timing != MMC_HS && timing != MMC_HS_52) ||
-	     hz > 52000000))
+	    ((timing != MMC_LEGACY && timing != MMC_HS && timing != MMC_HS_52 && timing != SD_HS) ||
+	     hz > 52000000 || (timing == SD_HS && hz > 50000000)))
 		return -EINVAL;
 	if (host->dev_comp->mt6577 && host->dma_disabled)
 		hz = min(hz, 12000000U);
