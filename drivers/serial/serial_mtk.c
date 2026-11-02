@@ -20,6 +20,7 @@
 #include <asm/io.h>
 #include <asm/types.h>
 #include <linux/err.h>
+#include <linux/math64.h>
 #include <linux/printk.h>
 
 struct mtk_serial_regs {
@@ -159,7 +160,7 @@ use_hs3:
 		quot = DIV_ROUND_UP(clk_rate, 256 * baud);
 		samplecount = clk_rate / (quot * baud);
 
-		fraction = ((clk_rate * 100) / quot / baud) % 100;
+		fraction = div_u64((u64)clk_rate * 100, quot * baud) % 100;
 		fraction = DIV_ROUND_CLOSEST(fraction, 10);
 
 		frac_l = fraction_l_mapping[fraction];
