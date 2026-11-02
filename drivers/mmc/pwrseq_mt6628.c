@@ -3,6 +3,7 @@
 #include <clk.h>
 #include <fs_loader.h>
 #include <malloc.h>
+#include <mmc.h>
 #include <pwrseq.h>
 #include <serial.h>
 #include <time.h>
@@ -16,7 +17,9 @@
 #include <asm/global_data.h>
 #include <dm/pinctrl.h>
 #include <dm/device_compat.h>
+#include <dm/device-internal.h>
 #include <dm/read.h>
+#include <dm/uclass.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -135,6 +138,7 @@ struct mt6628 {
 	u8 antenna_mode;
 	unsigned int requested;
 	bool busy;
+	bool draining;
 	bool initialized;
 	bool powered;
 	bool rtc_enabled;
@@ -618,6 +622,8 @@ static int mt6628_set_power(struct udevice *dev, bool enable)
 	struct mt6628 *ctx = dev_get_plat(dev);
 	int ret;
 
+	if (ctx->draining)
+		return enable ? -EBUSY : 0;
 	if (ctx->busy)
 		return -EBUSY;
 	if (!ctx->initialized)
@@ -696,10 +702,28 @@ out:
 static int mt6628_remove(struct udevice *dev)
 {
 	struct mt6628 *ctx = dev_get_plat(dev);
+	struct udevice *consumer;
+	struct uclass *uc;
 	int ret;
 
-	if (ctx->busy)
+	if (ctx->busy || ctx->draining)
 		return -EBUSY;
+	ret = uclass_get(UCLASS_MMC, &uc);
+	if (ret)
+		return ret;
+	ctx->draining = true;
+	uclass_foreach_dev(consumer, uc) {
+		struct mmc *mmc = mmc_get_mmc_dev(consumer);
+
+		if (!mmc || mmc->cfg->pwr_dev != dev)
+			continue;
+		ret = device_remove(consumer, DM_REMOVE_NORMAL);
+		if (ret) {
+			ctx->draining = false;
+			return ret;
+		}
+	}
+	ctx->draining = false;
 	if (ctx->initialized) {
 		ret = mt6628_set_power(dev, false);
 		if (ret)
