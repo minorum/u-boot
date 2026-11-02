@@ -12,6 +12,7 @@
 #include <dm.h>
 #include <dm/device.h>
 #include <dm/device_compat.h>
+#include <dm/root.h>
 #include <errno.h>
 #include <log.h>
 #include <serial.h>
@@ -375,6 +376,7 @@ U_BOOT_DRIVER(serial_mtk) = {
 	.name = "serial_mtk",
 	.id = UCLASS_SERIAL,
 	.of_match = mtk_serial_ids,
+	.bind = dm_scan_fdt_dev,
 	.of_to_plat = mtk_serial_of_to_plat,
 	.plat_auto	= sizeof(struct mtk_serial_priv),
 	.probe = mtk_serial_probe,
