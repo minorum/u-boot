@@ -491,6 +491,8 @@ static u32 msdc_cmd_prepare_raw_cmd(struct msdc_host *host,
 
 		if (data->blocks > 1)
 			dtype = 2;
+		else if (!dtype)
+			dtype = 1;
 
 		blocksize = data->blocksize;
 	}
