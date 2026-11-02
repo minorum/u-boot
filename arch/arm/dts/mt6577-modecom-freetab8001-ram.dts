@@ -246,6 +246,9 @@
 		};
 	};
 
+	wifi_mmc: mmc@c1240000 {
+	};
+
 	mmc@c1220000 {
 		compatible = "mediatek,mt6577-mmc";
 		reg = <0xc1220000 0x1000>;
@@ -304,4 +307,12 @@
 		dr_mode = "peripheral";
 		power-supplies = <&charger>;
 	};
+};
+
+#include "mt6577-modecom-wifi.dtsi"
+
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&combo_safe>;
+	/delete-property/ pinctrl-1;
 };
