@@ -388,6 +388,7 @@ static const struct pinconf_param mtk_conf_params[] = {
 	{ "input-enable", PIN_CONFIG_INPUT_ENABLE, 1 },
 	{ "input-disable", PIN_CONFIG_INPUT_ENABLE, 0 },
 	{ "output-enable", PIN_CONFIG_OUTPUT_ENABLE, 1 },
+	{ "output-disable", PIN_CONFIG_OUTPUT_ENABLE, 0 },
 	{ "output-high", PIN_CONFIG_OUTPUT, 1, },
 	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
 	{ "drive-strength", PIN_CONFIG_DRIVE_STRENGTH, 0 },
@@ -629,7 +630,11 @@ int mtk_pinconf_drive_set(struct udevice *dev, u32 pin, u32 arg)
 static int mtk_pinconf_set(struct udevice *dev, unsigned int pin,
 			   unsigned int param, unsigned int arg)
 {
+	struct mtk_pinctrl_priv *priv = dev_get_priv(dev);
 	int err = 0;
+
+	if (pin >= (unsigned int)priv->soc->npins)
+		return -EINVAL;
 
 	switch (param) {
 	case PIN_CONFIG_BIAS_DISABLE:
@@ -640,6 +645,10 @@ static int mtk_pinconf_set(struct udevice *dev, unsigned int pin,
 			goto err;
 		break;
 	case PIN_CONFIG_OUTPUT_ENABLE:
+		if (!arg) {
+			err = mtk_hw_set_value(dev, pin, PINCTRL_PIN_REG_DIR, 0);
+			break;
+		}
 		err = mtk_hw_set_value(dev, pin, PINCTRL_PIN_REG_SMT, 0);
 		if (err)
 			goto err;
