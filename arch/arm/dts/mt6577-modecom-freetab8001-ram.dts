@@ -16,6 +16,7 @@
 	aliases {
 		i2c0 = &pmic_i2c;
 		i2c1 = &charger_i2c;
+		serial2 = &uart2;
 	};
 
 	battery: battery {
@@ -176,6 +177,17 @@
 			 <&apmixedsys CLK_MT6577_WPLL61>;
 		clock-names = "axi", "clk26m", "wpll197", "wpll61";
 		#clock-cells = <1>;
+	};
+
+	uart2: serial@c100b000 {
+		compatible = "mediatek,mt6577-uart";
+		reg = <0xc100b000 0x100>;
+		interrupt-parent = <&sysirq>;
+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
+		clocks = <&pericfg CLK_MT6577_UART2>,
+			 <&pericfg CLK_MT6577_UART2>;
+		clock-names = "baud", "bus";
+		status = "disabled";
 	};
 
 	charger_i2c: i2c@c1012000 {
