@@ -13,9 +13,12 @@
 #include <linux/string.h>
 #include <asm/unaligned.h>
 #include <asm/gpio.h>
+#include <asm/global_data.h>
 #include <dm/pinctrl.h>
 #include <dm/device_compat.h>
 #include <dm/read.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 #define MT6628_STP_MAX 2048
 
@@ -643,6 +646,10 @@ static int mt6628_probe(struct udevice *dev)
 	ctx->busy = true;
 	ctx->dev = dev;
 	ctx->uart = dev->parent;
+	if (gd->cur_serial_dev == ctx->uart) {
+		ret = -EBUSY;
+		goto out;
+	}
 	if (device_get_uclass_id(ctx->uart) != UCLASS_SERIAL) {
 		ret = -EINVAL;
 		goto out;
