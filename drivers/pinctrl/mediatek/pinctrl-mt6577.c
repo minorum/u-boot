@@ -19,11 +19,21 @@ static const struct mtk_pin_field_calc mt6577_pin_di_range[] = {
 	PIN_FIELD_CALC(0, 231, 0xa00, 0x10, 0, 1, 16, false),
 };
 
+static const struct mtk_pin_field_calc mt6577_pin_pullen_range[] = {
+	PIN_FIELD_CALC(0, 231, 0x200, 0x10, 0, 1, 16, false),
+};
+
+static const struct mtk_pin_field_calc mt6577_pin_pullsel_range[] = {
+	PIN_FIELD_CALC(0, 231, 0x400, 0x10, 0, 1, 16, false),
+};
+
 static const struct mtk_pin_reg_calc mt6577_reg_cals[PINCTRL_PIN_REG_MAX] = {
 	[PINCTRL_PIN_REG_MODE] = MTK_RANGE(mt6577_pin_mode_range),
 	[PINCTRL_PIN_REG_DIR] = MTK_RANGE(mt6577_pin_dir_range),
 	[PINCTRL_PIN_REG_DO] = MTK_RANGE(mt6577_pin_do_range),
 	[PINCTRL_PIN_REG_DI] = MTK_RANGE(mt6577_pin_di_range),
+	[PINCTRL_PIN_REG_PULLEN] = MTK_RANGE(mt6577_pin_pullen_range),
+	[PINCTRL_PIN_REG_PULLSEL] = MTK_RANGE(mt6577_pin_pullsel_range),
 };
 
 static const struct mtk_pin_desc mt6577_pins[] = {
@@ -261,6 +271,15 @@ static const struct mtk_pin_desc mt6577_pins[] = {
 	MTK_PIN(231, "GPIO231", DRV_FIXED),
 };
 
+static const struct mtk_io_type_desc mt6577_io_type[] = {
+	{
+		.name = "mt6577",
+#if CONFIG_IS_ENABLED(PINCONF)
+		.bias_set = mtk_pinconf_bias_set_pullen_pullsel,
+#endif
+	},
+};
+
 static const struct mtk_pinctrl_soc mt6577_data = {
 	.name = "mt6577",
 	.reg_cal = mt6577_reg_cals,
@@ -268,6 +287,8 @@ static const struct mtk_pinctrl_soc mt6577_data = {
 	.npins = ARRAY_SIZE(mt6577_pins),
 	.gpio_mode = 0,
 	.rev = MTK_PINCTRL_V0,
+	.io_type = mt6577_io_type,
+	.ntype = ARRAY_SIZE(mt6577_io_type),
 };
 
 static int mt6577_pinctrl_probe(struct udevice *dev)
