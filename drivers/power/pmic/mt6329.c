@@ -23,7 +23,7 @@ static int mt6329_read(struct udevice *dev, uint reg, u8 *data, int len)
 		return dm_i2c_read(bank, reg & 0xff, data, len);
 	}
 	if (reg != 0 && reg != 1 && reg != 0x21 && reg != 0x2e && reg != 0x30 &&
-	    reg != 0x9b && reg != 0xa7 &&
+	    reg != 0x33 && reg != 0x34 && reg != 0x9b && reg != 0xa7 &&
 	    reg != 0x38 && reg != 0xe8 && reg != 0xe9 &&
 	    reg != 0xdc && reg != 0xdd && reg != 0xe0 && reg != 0xe1)
 		return -EACCES;
@@ -39,6 +39,12 @@ static int mt6329_write(struct udevice *dev, uint reg, const u8 *data, int len)
 	if (len != 1)
 		return -EACCES;
 	switch (reg) {
+	case 0x33:
+		mask = 0x0f;
+		break;
+	case 0x34:
+		mask = 0xff;
+		break;
 	case 0x9b:
 		mask = BIT(0);
 		break;

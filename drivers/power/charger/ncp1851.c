@@ -36,7 +36,8 @@ struct ncp1851_history {
 
 struct ncp1851 {
 	struct ncp1851_history *history;
-	struct udevice *dev, *adc, *thermal;
+	struct udevice *dev, *adc, *thermal, *source;
+	struct charger_usb_source usb_source;
 	struct cyclic_info cyclic;
 	unsigned int channel;
 	u8 regs[NCP1851_MAX_REG + 1];
@@ -273,6 +274,21 @@ static int ncp1851_measure(struct ncp1851 *chip)
 	return thermal_get_temp(chip->thermal, &chip->temp_mc);
 }
 
+static int ncp1851_input_permission(struct ncp1851 *chip, int *input)
+{
+	int budget = chip->input_budget;
+	int ret;
+
+	if (chip->source) {
+		ret = charger_get_usb_source(chip->source, &chip->usb_source);
+		if (ret)
+			return ret;
+		budget = chip->usb_source.online ? chip->usb_source.current_max_ua : 0;
+	}
+	*input = ncp1851_input_code(min(budget, chip->input_max));
+	return 0;
+}
+
 static int ncp1851_update(struct ncp1851 *chip)
 {
 	int ret, input, health;
@@ -291,7 +307,9 @@ static int ncp1851_update(struct ncp1851 *chip)
 		chip->input_budget = min(chip->input_budget, 100000);
 	}
 	chip->online = online;
-	input = ncp1851_input_code(min(chip->input_budget, chip->input_max));
+	ret = ncp1851_input_permission(chip, &input);
+	if (ret)
+		goto fail;
 	if (!online || input < 0 || chip->health != CHARGER_HEALTH_GOOD ||
 	    ncp1851_health(chip) != CHARGER_HEALTH_GOOD ||
 	    !ncp1851_configured(chip, input)) {
@@ -300,6 +318,9 @@ static int ncp1851_update(struct ncp1851 *chip)
 			goto fail;
 	}
 	ret = ncp1851_measure(chip);
+	if (ret)
+		goto fail;
+	ret = ncp1851_input_permission(chip, &input);
 	if (ret)
 		goto fail;
 	health = ncp1851_health(chip);
@@ -320,6 +341,20 @@ static int ncp1851_update(struct ncp1851 *chip)
 			goto fail;
 		if (ncp1851_health(chip) != CHARGER_HEALTH_GOOD)
 			goto check_health;
+	}
+	if (chip->source) {
+		int authorized;
+
+		ret = ncp1851_input_permission(chip, &authorized);
+		if (ret)
+			goto fail;
+		if (authorized != input) {
+			ret = ncp1851_inhibit(chip);
+			if (ret)
+				goto fail;
+			chip->status = CHARGER_STATE_NOT_CHARGING;
+			return 0;
+		}
 	}
 	restart = chip->history->cycle_pending;
 	chip->history->cycle_pending = false;
@@ -386,12 +421,35 @@ static int ncp1851_get_status(struct udevice *dev,
 	status->online = chip->online;
 	status->input_present = !!(chip->regs[NCP1851_VIN] & BIT(3));
 	status->input_budget_ua = chip->input_budget;
+	status->usb_source_valid = !!chip->source;
+	status->usb_source = chip->usb_source;
 	status->voltage_uv = chip->voltage_uv;
 	status->temp_mc = chip->temp_mc;
 	status->input_current_valid = (chip->regs[NCP1851_CTRL2] & 6) == 2;
 	status->input_current_ua = status->input_current_valid ?
 		ncp1851_input_limits[chip->regs[NCP1851_MISC] & 3] : 0;
 	return 0;
+}
+
+static int ncp1851_set_usb_current(struct udevice *dev, int ua)
+{
+	struct ncp1851 *chip = dev_get_priv(dev);
+
+	if (ua < 0)
+		return -EINVAL;
+	if (!chip->source)
+		return -ENOSYS;
+	return charger_set_usb_current(chip->source, ua);
+}
+
+static int ncp1851_set_usb_event_poll(struct udevice *dev, int (*poll)(void *),
+				      void *data)
+{
+	struct ncp1851 *chip = dev_get_priv(dev);
+
+	if (!chip->source)
+		return -ENOSYS;
+	return charger_set_usb_event_poll(chip->source, poll, data);
 }
 
 static int ncp1851_set_input_current(struct udevice *dev, int ua)
@@ -401,6 +459,11 @@ static int ncp1851_set_input_current(struct udevice *dev, int ua)
 
 	if (ua < 0)
 		return -EINVAL;
+	if (chip->source) {
+		ret = charger_set_usb_current(chip->source, ua);
+		if (ret)
+			return ret;
+	}
 	if (chip->busy)
 		return -EBUSY;
 	if (chip->stopped)
@@ -419,6 +482,11 @@ static int ncp1851_remove(struct udevice *dev)
 
 	if (chip->busy)
 		return -EBUSY;
+	if (chip->source) {
+		ret = charger_set_usb_event_poll(chip->source, NULL, NULL);
+		if (ret && ret != -ENOSYS)
+			return ret;
+	}
 	cyclic_unregister(&chip->cyclic);
 	chip->stopped = true;
 	chip->busy = true;
@@ -503,6 +571,12 @@ static int ncp1851_probe(struct udevice *dev)
 	ret = ncp1851_read_profile(chip);
 	if (ret)
 		goto fail;
+	if (dev_read_prop(dev, "power-supplies", NULL)) {
+		ret = uclass_get_device_by_phandle(UCLASS_CHARGER, dev,
+						 "power-supplies", &chip->source);
+		if (ret)
+			goto fail;
+	}
 	ret = dev_read_phandle_with_args(dev, "io-channels",
 					 "#io-channel-cells", 0, 0, &args);
 	if (ret)
@@ -532,7 +606,8 @@ static int ncp1851_probe(struct udevice *dev)
 	ret = ncp1851_refresh(chip);
 	if (ret)
 		goto fail;
-	cyclic_register(&chip->cyclic, ncp1851_periodic, NCP1851_POLL_MS * 1000,
+	cyclic_register(&chip->cyclic, ncp1851_periodic,
+			chip->source ? 1000000 : NCP1851_POLL_MS * 1000,
 			dev->name);
 	return 0;
 fail:
@@ -551,6 +626,8 @@ static int ncp1851_bind(struct udevice *dev)
 static const struct charger_ops ncp1851_ops = {
 	.get_status = ncp1851_get_status,
 	.set_input_current = ncp1851_set_input_current,
+	.set_usb_current = ncp1851_set_usb_current,
+	.set_usb_event_poll = ncp1851_set_usb_event_poll,
 };
 
 static const struct udevice_id ncp1851_ids[] = {

@@ -23,6 +23,12 @@ static int do_charger(struct cmd_tbl *cmdtp, int flag, int argc,
 		[CHARGER_HEALTH_SAFETY_TIMER] = "safety-timer",
 		[CHARGER_HEALTH_FAULT] = "fault",
 	};
+	static const char *const usb_types[] = {
+		[CHARGER_USB_UNKNOWN] = "unknown",
+		[CHARGER_USB_SDP] = "SDP",
+		[CHARGER_USB_DCP] = "DCP",
+		[CHARGER_USB_CDP] = "CDP",
+	};
 	struct charger_status status;
 	struct udevice *dev;
 	int ret;
@@ -52,6 +58,12 @@ static int do_charger(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf("unknown\n");
 	printf("input-present: %s, accepted-budget: %d uA\n",
 	       status.input_present ? "yes" : "no", status.input_budget_ua);
+	if (status.usb_source_valid)
+		printf("USB source: %s, online: %s, authorization: %d uA\n",
+		       (unsigned int)status.usb_source.type < ARRAY_SIZE(usb_types) ?
+		       usb_types[status.usb_source.type] : "unknown",
+		       status.usb_source.online ? "yes" : "no",
+		       status.usb_source.current_max_ua);
 	return CMD_RET_SUCCESS;
 }
 

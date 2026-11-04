@@ -19,6 +19,9 @@ Description
 Display the charging state, health, input presence, battery voltage in
 microvolts, battery temperature in millidegrees Celsius and configured input
 current limit in microamps for a named driver-model charger.
+If a USB source is available, also display its detected type, physical
+presence and current authorization separately from the accepted USB budget
+and programmed charger limit.
 
 The input current limit is not a measurement of battery or USB current.
 The command does not estimate battery capacity or change charging limits.
