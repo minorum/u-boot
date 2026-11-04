@@ -149,13 +149,13 @@ static int ncp1851_read_regs(struct ncp1851 *chip)
 		if (ret)
 			return ret;
 		regs[addresses[i]] = value;
+		if (addresses[i] == NCP1851_CTRL1 &&
+		    (regs[NCP1851_STATUS] >> 4) == 11 && (value & NCP1851_CHGEN))
+			chip->history->fault_latched = true;
 		if (addresses[i] == NCP1851_CH2_INT)
 			chip->history->timer_fault |= value & NCP1851_TIMER_FAULTS;
 	}
 	memcpy(chip->regs, regs, sizeof(regs));
-	if ((regs[NCP1851_STATUS] >> 4) == 11 &&
-	    (regs[NCP1851_CTRL1] & NCP1851_CHGEN))
-		chip->history->fault_latched = true;
 	return 0;
 }
 
