@@ -50,6 +50,8 @@ static int do_charger(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf("%d uA\n", status.input_current_ua);
 	else
 		printf("unknown\n");
+	printf("input-present: %s, accepted-budget: %d uA\n",
+	       status.input_present ? "yes" : "no", status.input_budget_ua);
 	return CMD_RET_SUCCESS;
 }
 

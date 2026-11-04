@@ -383,6 +383,8 @@ static int ncp1851_get_status(struct udevice *dev,
 	status->state = chip->status;
 	status->health = chip->health;
 	status->online = chip->online;
+	status->input_present = !!(chip->regs[NCP1851_VIN] & BIT(3));
+	status->input_budget_ua = chip->input_budget;
 	status->voltage_uv = chip->voltage_uv;
 	status->temp_mc = chip->temp_mc;
 	status->input_current_valid = (chip->regs[NCP1851_CTRL2] & 6) == 2;
