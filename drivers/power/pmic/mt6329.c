@@ -22,7 +22,7 @@ static int mt6329_read(struct udevice *dev, uint reg, u8 *data, int len)
 			return ret;
 		return dm_i2c_read(bank, reg & 0xff, data, len);
 	}
-	if (reg != 0 && reg != 1 && reg != 0x9b && reg != 0xa7 &&
+	if (reg != 0 && reg != 1 && reg != 0x21 && reg != 0x9b && reg != 0xa7 &&
 	    reg != 0x38 && reg != 0xe8 && reg != 0xe9 &&
 	    reg != 0xdc && reg != 0xdd && reg != 0xe0 && reg != 0xe1)
 		return -EACCES;
