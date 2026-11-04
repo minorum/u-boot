@@ -22,7 +22,8 @@ static int mt6329_read(struct udevice *dev, uint reg, u8 *data, int len)
 			return ret;
 		return dm_i2c_read(bank, reg & 0xff, data, len);
 	}
-	if (reg != 0 && reg != 1 && reg != 0x21 && reg != 0x9b && reg != 0xa7 &&
+	if (reg != 0 && reg != 1 && reg != 0x21 && reg != 0x2e && reg != 0x30 &&
+	    reg != 0x9b && reg != 0xa7 &&
 	    reg != 0x38 && reg != 0xe8 && reg != 0xe9 &&
 	    reg != 0xdc && reg != 0xdd && reg != 0xe0 && reg != 0xe1)
 		return -EACCES;
@@ -59,6 +60,31 @@ static int mt6329_write(struct udevice *dev, uint reg, const u8 *data, int len)
 	return dm_i2c_write(dev, reg, data, len);
 }
 
+static int mt6329_disable_charger(struct udevice *dev)
+{
+	static const struct {
+		unsigned int reg, mask;
+	} fields[] = {
+		{ 0x21, BIT(4) | BIT(3) },
+		{ 0x2e, BIT(4) },
+		{ 0x30, BIT(1) | BIT(0) },
+	};
+	unsigned int i;
+	int ret;
+
+	for (i = 0; i < ARRAY_SIZE(fields); i++) {
+		ret = dm_i2c_reg_clrset(dev, fields[i].reg, fields[i].mask, 0);
+		if (ret)
+			return ret;
+		ret = dm_i2c_reg_read(dev, fields[i].reg);
+		if (ret < 0)
+			return ret;
+		if (ret & fields[i].mask)
+			return -EIO;
+	}
+	return 0;
+}
+
 static int mt6329_probe(struct udevice *dev)
 {
 	static const uint registers[] = { 0, 1, 0x9b, 0xa7 };
@@ -75,6 +101,8 @@ static int mt6329_probe(struct udevice *dev)
 		return -ENODEV;
 	if ((data[2] | data[3]) & BIT(1))
 		return -EOPNOTSUPP;
+	if (dev_read_bool(dev, "mediatek,external-charger"))
+		return mt6329_disable_charger(dev);
 	return 0;
 }
 
