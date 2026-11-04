@@ -159,6 +159,8 @@ cleanup:
 static irqreturn_t mt6577_interrupt(int irq, void *data)
 {
 	struct musb *musb = data;
+	struct mt6577_glue *glue = container_of(musb->controller,
+						    struct mt6577_glue, dev);
 	void __iomem *base = musb->mregs;
 	irqreturn_t ret = IRQ_NONE;
 
@@ -170,6 +172,7 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 		       musb_readw(base, MUSB_INTRRXE);
 	mb();
 	musb_writeb(base, MUSB_INTRUSB, musb->int_usb);
+	glue->budget_events &= ~musb->int_usb;
 	musb_writew(base, MUSB_INTRTX, musb->int_tx);
 	musb_writew(base, MUSB_INTRRX, musb->int_rx);
 	if (musb->int_usb & MUSB_INTR_RESET) {
