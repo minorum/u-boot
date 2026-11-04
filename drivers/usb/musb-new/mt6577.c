@@ -175,7 +175,13 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 	glue->budget_events &= ~musb->int_usb;
 	musb_writew(base, MUSB_INTRTX, musb->int_tx);
 	musb_writew(base, MUSB_INTRRX, musb->int_rx);
-	if (musb->int_usb & MUSB_INTR_RESET) {
+	if (musb->int_usb & MUSB_INTR_DISCONNECT) {
+		musb_g_disconnect(musb);
+		musb->int_usb = 0;
+		musb->int_tx = 0;
+		musb->int_rx = 0;
+		ret = IRQ_HANDLED;
+	} else if (musb->int_usb & MUSB_INTR_RESET) {
 		mt6577_reset_trace[0]++;
 		mt6577_reset_trace[1] = musb_readb(base, MUSB_FADDR);
 		mt6577_reset_trace[3] = musb_readb(base, MUSB_POWER);
@@ -187,11 +193,6 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 		mt6577_reset_trace[5] = musb_readw(musb->endpoints[0].regs,
 						  MUSB_CSR0);
 		musb->int_tx &= 1;
-		musb->int_rx = 0;
-		ret = IRQ_HANDLED;
-	} else if (musb->int_usb & MUSB_INTR_DISCONNECT) {
-		musb_g_disconnect(musb);
-		musb->int_tx = 0;
 		musb->int_rx = 0;
 		ret = IRQ_HANDLED;
 	}
