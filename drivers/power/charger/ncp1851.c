@@ -394,6 +394,7 @@ static int ncp1851_get_status(struct udevice *dev,
 static int ncp1851_set_input_current(struct udevice *dev, int ua)
 {
 	struct ncp1851 *chip = dev_get_priv(dev);
+	int ret;
 
 	if (ua < 0)
 		return -EINVAL;
@@ -402,7 +403,10 @@ static int ncp1851_set_input_current(struct udevice *dev, int ua)
 	if (chip->stopped)
 		return -ESHUTDOWN;
 	chip->input_budget = min(ua, chip->input_max);
-	return ncp1851_refresh(chip);
+	ret = ncp1851_refresh(chip);
+	if (!ret && chip->input_budget != min(ua, chip->input_max))
+		ret = -EAGAIN;
+	return ret;
 }
 
 static int ncp1851_remove(struct udevice *dev)
