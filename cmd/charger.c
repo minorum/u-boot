@@ -27,23 +27,12 @@ static int do_charger(struct cmd_tbl *cmdtp, int flag, int argc,
 	struct udevice *dev;
 	int ret;
 
-	if (argc == 4 && !strcmp(argv[1], "inhibit")) {
-		if (strcmp(argv[3], "on") && strcmp(argv[3], "off"))
-			return CMD_RET_USAGE;
-	} else if (argc != 3 || strcmp(argv[1], "status")) {
+	if (argc != 3 || strcmp(argv[1], "status"))
 		return CMD_RET_USAGE;
-	}
 	ret = uclass_get_device_by_name(UCLASS_CHARGER, argv[2], &dev);
 	if (ret) {
 		printf("Charger %s unavailable: %d\n", argv[2], ret);
 		return CMD_RET_FAILURE;
-	}
-	if (argc == 4) {
-		ret = charger_set_inhibit(dev, !strcmp(argv[3], "on"));
-		if (ret) {
-			printf("Charger %s inhibit failed: %d\n", dev->name, ret);
-			return CMD_RET_FAILURE;
-		}
 	}
 	ret = charger_get_status(dev, &status);
 	if (ret) {
@@ -63,12 +52,10 @@ static int do_charger(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf("unknown\n");
 	printf("input-present: %s, accepted-budget: %d uA\n",
 	       status.input_present ? "yes" : "no", status.input_budget_ua);
-	printf("charge-behaviour: %s\n", status.inhibit_charge ? "inhibit-charge" : "auto");
 	return CMD_RET_SUCCESS;
 }
 
-U_BOOT_CMD(charger, 4, 1, do_charger,
-	   "display charger status or inhibit charging",
-	   "status <device>\n"
-	   "charger inhibit <device> <on|off>"
+U_BOOT_CMD(charger, 3, 1, do_charger,
+	   "display charger status",
+	   "status <device>"
 );

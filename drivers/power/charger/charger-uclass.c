@@ -29,15 +29,6 @@ int charger_set_input_current(struct udevice *dev, int ua)
 	return ops->set_input_current(dev, ua);
 }
 
-int charger_set_inhibit(struct udevice *dev, bool inhibit)
-{
-	const struct charger_ops *ops = device_get_ops(dev);
-
-	if (!ops || !ops->set_inhibit)
-		return -ENOSYS;
-	return ops->set_inhibit(dev, inhibit);
-}
-
 UCLASS_DRIVER(charger) = {
 	.id = UCLASS_CHARGER,
 	.name = "charger",
