@@ -502,35 +502,44 @@ static int ncp1851_probe(struct udevice *dev)
 	chip->history = dev_get_plat(dev);
 	ret = ncp1851_read_profile(chip);
 	if (ret)
-		return ret;
+		goto fail;
 	ret = dev_read_phandle_with_args(dev, "io-channels",
 					 "#io-channel-cells", 0, 0, &args);
 	if (ret)
-		return ret;
-	if (args.args_count != 1 || args.args[0] > ADC_MAX_CHANNEL)
-		return -EINVAL;
+		goto fail;
+	if (args.args_count != 1 || args.args[0] > ADC_MAX_CHANNEL) {
+		ret = -EINVAL;
+		goto fail;
+	}
 	chip->channel = args.args[0];
 	ret = uclass_get_device_by_ofnode(UCLASS_ADC, args.node, &chip->adc);
 	if (ret)
-		return ret;
+		goto fail;
 	ret = dev_read_phandle_with_args(dev, "io-channels",
 					 "#io-channel-cells", 0, 1, &args);
 	if (ret)
-		return ret;
-	if (args.args_count)
-		return -EINVAL;
+		goto fail;
+	if (args.args_count) {
+		ret = -EINVAL;
+		goto fail;
+	}
 	ret = uclass_get_device_by_ofnode(UCLASS_THERMAL, args.node,
 					  &chip->thermal);
 	if (ret)
-		return ret;
+		goto fail;
 	chip->input_budget = 100000;
 	chip->stopped = false;
 	ret = ncp1851_refresh(chip);
 	if (ret)
-		return ret;
+		goto fail;
 	cyclic_register(&chip->cyclic, ncp1851_periodic, NCP1851_POLL_MS * 1000,
 			dev->name);
 	return 0;
+fail:
+	chip->stopped = true;
+	if (ncp1851_inhibit(chip))
+		dev_err(dev, "Cannot inhibit charging\n");
+	return ret;
 }
 
 static int ncp1851_bind(struct udevice *dev)
