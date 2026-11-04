@@ -297,9 +297,8 @@ static int ncp1851_input_permission(struct ncp1851 *chip, int *input)
 	return 0;
 }
 
-static int ncp1851_wait_ready(struct ncp1851 *chip, int input)
+static int ncp1851_wait_ready(struct ncp1851 *chip, int input, unsigned long start)
 {
-	unsigned long start = get_timer(0);
 	int ret, authorized, state;
 
 	for (;;) {
@@ -329,6 +328,7 @@ static int ncp1851_wait_ready(struct ncp1851 *chip, int input)
 
 static int ncp1851_update(struct ncp1851 *chip)
 {
+	unsigned long start = 0;
 	int ret, input, health;
 	bool online, restart, startup;
 
@@ -401,13 +401,15 @@ static int ncp1851_update(struct ncp1851 *chip)
 	}
 	restart = chip->history->cycle_pending;
 	chip->history->cycle_pending = false;
+	if (startup)
+		start = get_timer(0);
 	ret = ncp1851_ctrl1(chip, true, restart);
 	if (ret)
 		goto fail;
 	ret = ncp1851_kick(chip);
 	if (ret)
 		goto fail;
-	ret = startup ? ncp1851_wait_ready(chip, input) :
+	ret = startup ? ncp1851_wait_ready(chip, input, start) :
 		       ncp1851_verify_config(chip, input, true);
 	if (ret)
 		goto fail;
