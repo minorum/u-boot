@@ -31,6 +31,7 @@ struct charger_status {
 	bool online;
 	bool input_present;
 	bool input_current_valid;
+	bool inhibit_charge;
 	int voltage_uv;
 	int temp_mc;
 	int input_current_ua;
@@ -40,9 +41,11 @@ struct charger_status {
 struct charger_ops {
 	int (*get_status)(struct udevice *dev, struct charger_status *status);
 	int (*set_input_current)(struct udevice *dev, int ua);
+	int (*set_inhibit)(struct udevice *dev, bool inhibit);
 };
 
 int charger_get_status(struct udevice *dev, struct charger_status *status);
 int charger_set_input_current(struct udevice *dev, int ua);
+int charger_set_inhibit(struct udevice *dev, bool inhibit);
 
 #endif

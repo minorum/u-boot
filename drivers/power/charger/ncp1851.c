@@ -31,7 +31,7 @@ static const int ncp1851_input_limits[] = { 100000, 500000, 900000, 1500000 };
 
 struct ncp1851_history {
 	unsigned int timer_fault;
-	bool fault_latched, cycle_pending;
+	bool fault_latched, cycle_pending, inhibit_charge;
 };
 
 struct ncp1851 {
@@ -292,7 +292,8 @@ static int ncp1851_update(struct ncp1851 *chip)
 	}
 	chip->online = online;
 	input = ncp1851_input_code(min(chip->input_budget, chip->input_max));
-	if (!online || input < 0 || chip->health != CHARGER_HEALTH_GOOD ||
+	if (!online || chip->history->inhibit_charge || input < 0 ||
+	    chip->health != CHARGER_HEALTH_GOOD ||
 	    ncp1851_health(chip) != CHARGER_HEALTH_GOOD ||
 	    !ncp1851_configured(chip, input)) {
 		ret = ncp1851_inhibit(chip);
@@ -304,7 +305,8 @@ static int ncp1851_update(struct ncp1851 *chip)
 		goto fail;
 	health = ncp1851_health(chip);
 	chip->health = health;
-	if (!online || input < 0 || health != CHARGER_HEALTH_GOOD) {
+	if (!online || chip->history->inhibit_charge || input < 0 ||
+	    health != CHARGER_HEALTH_GOOD) {
 		ret = ncp1851_inhibit(chip);
 		if (ret)
 			goto fail;
@@ -386,6 +388,7 @@ static int ncp1851_get_status(struct udevice *dev,
 	status->online = chip->online;
 	status->input_present = !!(chip->regs[NCP1851_VIN] & BIT(3));
 	status->input_budget_ua = chip->input_budget;
+	status->inhibit_charge = chip->history->inhibit_charge;
 	status->voltage_uv = chip->voltage_uv;
 	status->temp_mc = chip->temp_mc;
 	status->input_current_valid = (chip->regs[NCP1851_CTRL2] & 6) == 2;
@@ -410,6 +413,18 @@ static int ncp1851_set_input_current(struct udevice *dev, int ua)
 	if (!ret && chip->input_budget != min(ua, chip->input_max))
 		ret = -EAGAIN;
 	return ret;
+}
+
+static int ncp1851_set_inhibit(struct udevice *dev, bool inhibit)
+{
+	struct ncp1851 *chip = dev_get_priv(dev);
+
+	if (chip->busy)
+		return -EBUSY;
+	if (chip->stopped)
+		return -ESHUTDOWN;
+	chip->history->inhibit_charge = inhibit;
+	return ncp1851_refresh(chip);
 }
 
 static int ncp1851_remove(struct udevice *dev)
@@ -551,6 +566,7 @@ static int ncp1851_bind(struct udevice *dev)
 static const struct charger_ops ncp1851_ops = {
 	.get_status = ncp1851_get_status,
 	.set_input_current = ncp1851_set_input_current,
+	.set_inhibit = ncp1851_set_inhibit,
 };
 
 static const struct udevice_id ncp1851_ids[] = {
