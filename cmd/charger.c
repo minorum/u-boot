@@ -44,8 +44,12 @@ static int do_charger(struct cmd_tbl *cmdtp, int flag, int argc,
 	       states[status.state] : "unknown",
 	       (unsigned int)status.health < ARRAY_SIZE(health) ?
 	       health[status.health] : "unknown", status.online ? "yes" : "no");
-	printf("voltage: %d uV, temperature: %d mC, input-limit: %d uA\n",
-	       status.voltage_uv, status.temp_mc, status.input_current_ua);
+	printf("voltage: %d uV, temperature: %d mC, input-limit: ",
+	       status.voltage_uv, status.temp_mc);
+	if (status.input_current_valid)
+		printf("%d uA\n", status.input_current_ua);
+	else
+		printf("unknown\n");
 	return CMD_RET_SUCCESS;
 }
 

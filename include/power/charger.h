@@ -29,6 +29,7 @@ struct charger_status {
 	enum charger_state state;
 	enum charger_health health;
 	bool online;
+	bool input_current_valid;
 	int voltage_uv;
 	int temp_mc;
 	int input_current_ua;

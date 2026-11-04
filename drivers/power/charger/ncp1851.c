@@ -375,18 +375,19 @@ static int ncp1851_get_status(struct udevice *dev,
 			      struct charger_status *status)
 {
 	struct ncp1851 *chip = dev_get_priv(dev);
-	int ret, input;
+	int ret;
 
 	ret = ncp1851_refresh(chip);
 	if (ret)
 		return ret;
-	input = ncp1851_input_code(chip->input_budget);
 	status->state = chip->status;
 	status->health = chip->health;
 	status->online = chip->online;
 	status->voltage_uv = chip->voltage_uv;
 	status->temp_mc = chip->temp_mc;
-	status->input_current_ua = input < 0 ? 0 : ncp1851_input_limits[input];
+	status->input_current_valid = (chip->regs[NCP1851_CTRL2] & 6) == 2;
+	status->input_current_ua = status->input_current_valid ?
+		ncp1851_input_limits[chip->regs[NCP1851_MISC] & 3] : 0;
 	return 0;
 }
 
