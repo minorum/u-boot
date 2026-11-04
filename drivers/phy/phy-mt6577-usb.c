@@ -166,7 +166,7 @@ static int mt6577_bc11_refresh(struct mt6577_usb_phy *usb,
 	if (usb->failed)
 		return -EIO;
 	if (!usb->powered)
-		return 0;
+		return -ENODATA;
 	if (usb->detecting)
 		return -EBUSY;
 	ret = pmic_reg_read(usb->pmic, 0x21);

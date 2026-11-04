@@ -6,8 +6,10 @@
 #include <i2c.h>
 #include <limits.h>
 #include <thermal.h>
+#include <time.h>
 #include <power/charger.h>
 #include <linux/kernel.h>
+#include <linux/delay.h>
 
 #define NCP1851_STATUS 0x00
 #define NCP1851_CTRL1 0x01
@@ -44,7 +46,7 @@ struct ncp1851 {
 	unsigned int vreg, ichg, ieoc, iweak, vsys;
 	int temp_mc, voltage_uv, temp_min_mc, temp_max_mc, overvoltage_uv;
 	int input_max, input_budget, health, status;
-	bool power_path, online, busy, stopped;
+	bool power_path, online, busy, stopped, source_known;
 };
 
 static int ncp1851_read(struct ncp1851 *chip, unsigned int reg,
@@ -280,19 +282,55 @@ static int ncp1851_input_permission(struct ncp1851 *chip, int *input)
 	int ret;
 
 	if (chip->source) {
+		chip->source_known = false;
 		ret = charger_get_usb_source(chip->source, &chip->usb_source);
+		if (ret == -ENODATA) {
+			*input = -EINVAL;
+			return 0;
+		}
 		if (ret)
 			return ret;
+		chip->source_known = true;
 		budget = chip->usb_source.online ? chip->usb_source.current_max_ua : 0;
 	}
 	*input = ncp1851_input_code(min(budget, chip->input_max));
 	return 0;
 }
 
+static int ncp1851_wait_ready(struct ncp1851 *chip, int input)
+{
+	unsigned long start = get_timer(0);
+	int ret, authorized, state;
+
+	for (;;) {
+		if (get_timer(start) >= 1000)
+			return -ETIMEDOUT;
+		ret = ncp1851_verify_config(chip, input, true);
+		if (ret)
+			return ret;
+		if (ncp1851_health(chip) != CHARGER_HEALTH_GOOD)
+			return -EIO;
+		ret = ncp1851_input_permission(chip, &authorized);
+		if (ret)
+			return ret;
+		if (authorized != input)
+			return -EAGAIN;
+		if (get_timer(start) >= 1000)
+			return -ETIMEDOUT;
+		state = ncp1851_status(chip->regs[NCP1851_STATUS] >> 4,
+				       true, true);
+		if ((chip->regs[NCP1851_VIN] & NCP1851_INPUT_READY) ==
+		    NCP1851_INPUT_READY && !(chip->regs[NCP1851_CTRL1] & BIT(5)) &&
+		    (state == CHARGER_STATE_CHARGING || state == CHARGER_STATE_FULL))
+			return 0;
+		mdelay(10);
+	}
+}
+
 static int ncp1851_update(struct ncp1851 *chip)
 {
 	int ret, input, health;
-	bool online, restart;
+	bool online, restart, startup;
 
 	ret = ncp1851_read_regs(chip);
 	if (ret)
@@ -300,16 +338,17 @@ static int ncp1851_update(struct ncp1851 *chip)
 	online = (chip->regs[NCP1851_VIN] & NCP1851_INPUT_READY) ==
 			 NCP1851_INPUT_READY &&
 		 !(chip->regs[NCP1851_CTRL1] & BIT(5));
-	if (!(chip->regs[NCP1851_VIN] & BIT(3))) {
+	ret = ncp1851_input_permission(chip, &input);
+	if (ret)
+		goto fail;
+	if (chip->source ? chip->source_known && !chip->usb_source.online :
+	    !(chip->regs[NCP1851_VIN] & BIT(3))) {
 		chip->history->timer_fault = 0;
 		chip->history->fault_latched = false;
 		chip->history->cycle_pending = true;
 		chip->input_budget = min(chip->input_budget, 100000);
 	}
 	chip->online = online;
-	ret = ncp1851_input_permission(chip, &input);
-	if (ret)
-		goto fail;
 	if (!online || input < 0 || chip->health != CHARGER_HEALTH_GOOD ||
 	    ncp1851_health(chip) != CHARGER_HEALTH_GOOD ||
 	    !ncp1851_configured(chip, input)) {
@@ -325,7 +364,11 @@ static int ncp1851_update(struct ncp1851 *chip)
 		goto fail;
 	health = ncp1851_health(chip);
 	chip->health = health;
-	if (!online || input < 0 || health != CHARGER_HEALTH_GOOD) {
+	startup = !online && chip->source && chip->source_known &&
+		  chip->usb_source.online && input >= 0 &&
+		  !(chip->regs[NCP1851_STATUS] >> 4) &&
+		  !(chip->regs[NCP1851_CTRL1] & NCP1851_CHGEN);
+	if ((!online && !startup) || input < 0 || health != CHARGER_HEALTH_GOOD) {
 		ret = ncp1851_inhibit(chip);
 		if (ret)
 			goto fail;
@@ -364,9 +407,14 @@ static int ncp1851_update(struct ncp1851 *chip)
 	ret = ncp1851_kick(chip);
 	if (ret)
 		goto fail;
-	ret = ncp1851_verify_config(chip, input, true);
+	ret = startup ? ncp1851_wait_ready(chip, input) :
+		       ncp1851_verify_config(chip, input, true);
 	if (ret)
 		goto fail;
+	if (startup) {
+		online = true;
+		chip->online = true;
+	}
 check_health:
 	chip->health = ncp1851_health(chip);
 	if (chip->health != CHARGER_HEALTH_GOOD) {
@@ -421,7 +469,7 @@ static int ncp1851_get_status(struct udevice *dev,
 	status->online = chip->online;
 	status->input_present = !!(chip->regs[NCP1851_VIN] & BIT(3));
 	status->input_budget_ua = chip->input_budget;
-	status->usb_source_valid = !!chip->source;
+	status->usb_source_valid = !!chip->source && chip->source_known;
 	status->usb_source = chip->usb_source;
 	status->voltage_uv = chip->voltage_uv;
 	status->temp_mc = chip->temp_mc;
