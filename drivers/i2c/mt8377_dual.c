@@ -20,14 +20,14 @@
 #define DUAL_IO		0x40
 #define DUAL_HS		0x48
 
-struct mt6577_dual {
+struct mt8377_dual {
 	void __iomem *base;
 	struct clk clock;
 	bool push_pull;
 	bool busy;
 };
 
-static int mt6577_dual_timing(ulong rate)
+static int mt8377_dual_timing(ulong rate)
 {
 	u64 step;
 	unsigned int sample;
@@ -42,9 +42,9 @@ static int mt6577_dual_timing(ulong rate)
 	return -ERANGE;
 }
 
-static int mt6577_dual_transfer(struct udevice *dev, struct i2c_msg *msg, int count)
+static int mt8377_dual_transfer(struct udevice *dev, struct i2c_msg *msg, int count)
 {
-	struct mt6577_dual *dual = dev_get_priv(dev);
+	struct mt8377_dual *dual = dev_get_priv(dev);
 	void __iomem *base = dual->base;
 	bool reading = count == 2;
 	u16 status, value;
@@ -66,7 +66,7 @@ static int mt6577_dual_transfer(struct udevice *dev, struct i2c_msg *msg, int co
 		ret = -EBUSY;
 		goto disable;
 	}
-	timing = mt6577_dual_timing(clk_get_rate(&dual->clock));
+	timing = mt8377_dual_timing(clk_get_rate(&dual->clock));
 	if (timing < 0) {
 		ret = timing;
 		goto disable;
@@ -101,27 +101,27 @@ disable:
 	return cleanup ? cleanup : ret;
 }
 
-static int mt6577_dual_xfer(struct udevice *dev, struct i2c_msg *msg, int count)
+static int mt8377_dual_xfer(struct udevice *dev, struct i2c_msg *msg, int count)
 {
-	struct mt6577_dual *dual = dev_get_priv(dev);
+	struct mt8377_dual *dual = dev_get_priv(dev);
 	int ret;
 
 	if (dual->busy)
 		return -EBUSY;
 	dual->busy = true;
-	ret = mt6577_dual_transfer(dev, msg, count);
+	ret = mt8377_dual_transfer(dev, msg, count);
 	dual->busy = false;
 	return ret;
 }
 
-static int mt6577_dual_speed(struct udevice *dev, uint speed)
+static int mt8377_dual_speed(struct udevice *dev, uint speed)
 {
 	return speed == 100000 ? 0 : -EINVAL;
 }
 
-static int mt6577_dual_probe(struct udevice *dev)
+static int mt8377_dual_probe(struct udevice *dev)
 {
-	struct mt6577_dual *dual = dev_get_priv(dev);
+	struct mt8377_dual *dual = dev_get_priv(dev);
 
 	dual->base = dev_read_addr_ptr(dev);
 	if (!dual->base)
@@ -130,22 +130,24 @@ static int mt6577_dual_probe(struct udevice *dev)
 	return clk_get_by_name(dev, "main", &dual->clock);
 }
 
-static const struct dm_i2c_ops mt6577_dual_ops = {
-	.xfer = mt6577_dual_xfer,
-	.set_bus_speed = mt6577_dual_speed,
+static const struct dm_i2c_ops mt8377_dual_ops = {
+	.xfer = mt8377_dual_xfer,
+	.set_bus_speed = mt8377_dual_speed,
 };
 
-static const struct udevice_id mt6577_dual_ids[] = {
+static const struct udevice_id mt8377_dual_ids[] = {
+	{ .compatible = "mediatek,mt8377-i2c" },
 	{ .compatible = "mediatek,mt6577-i2c" },
+	{ .compatible = "mediatek,mt8377-i2c-dual" },
 	{ .compatible = "mediatek,mt6577-i2c-dual" },
 	{ }
 };
 
-U_BOOT_DRIVER(mt6577_dual_i2c) = {
-	.name = "mt6577_dual_i2c",
+U_BOOT_DRIVER(mt8377_dual_i2c) = {
+	.name = "mt8377_dual_i2c",
 	.id = UCLASS_I2C,
-	.of_match = mt6577_dual_ids,
-	.probe = mt6577_dual_probe,
-	.ops = &mt6577_dual_ops,
-	.priv_auto = sizeof(struct mt6577_dual),
+	.of_match = mt8377_dual_ids,
+	.probe = mt8377_dual_probe,
+	.ops = &mt8377_dual_ops,
+	.priv_auto = sizeof(struct mt8377_dual),
 };

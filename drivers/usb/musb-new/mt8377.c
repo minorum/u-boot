@@ -8,10 +8,10 @@
 #include <power/charger.h>
 #include "musb_uboot.h"
 
-#define MT6577_SWRST 0x74
-#define MT6577_L1INTM 0xa4
+#define MT8377_SWRST 0x74
+#define MT8377_L1INTM 0xa4
 
-struct mt6577_glue {
+struct mt8377_glue {
 	struct device dev;
 	struct musb *musb;
 	struct clk *bus;
@@ -29,7 +29,7 @@ struct mt6577_glue {
 	bool powered;
 };
 
-static int mt6577_apply_budget(struct mt6577_glue *glue)
+static int mt8377_apply_budget(struct mt8377_glue *glue)
 {
 	unsigned int ma;
 	int ret;
@@ -53,10 +53,10 @@ static int mt6577_apply_budget(struct mt6577_glue *glue)
 	return ret;
 }
 
-static int mt6577_vbus_draw(struct musb *musb, unsigned int ma)
+static int mt8377_vbus_draw(struct musb *musb, unsigned int ma)
 {
-	struct mt6577_glue *glue = container_of(musb->controller,
-						    struct mt6577_glue, dev);
+	struct mt8377_glue *glue = container_of(musb->controller,
+						    struct mt8377_glue, dev);
 
 	if (ma > INT_MAX / 1000)
 		return -EINVAL;
@@ -73,9 +73,9 @@ static int mt6577_vbus_draw(struct musb *musb, unsigned int ma)
 	return 0;
 }
 
-static int mt6577_usb_event_poll(void *data)
+static int mt8377_usb_event_poll(void *data)
 {
-	struct mt6577_glue *glue = data;
+	struct mt8377_glue *glue = data;
 	u8 events, fresh;
 	unsigned int ma;
 
@@ -89,22 +89,22 @@ static int mt6577_usb_event_poll(void *data)
 		return 0;
 	ma = events & MUSB_INTR_DISCONNECT ? 0 :
 		(events & MUSB_INTR_SUSPEND ? 2 : 100);
-	return mt6577_vbus_draw(glue->musb, ma);
+	return mt8377_vbus_draw(glue->musb, ma);
 }
 
-static void mt6577_budget_poll(struct cyclic_info *cyclic)
+static void mt8377_budget_poll(struct cyclic_info *cyclic)
 {
-	struct mt6577_glue *glue = container_of(cyclic, struct mt6577_glue,
+	struct mt8377_glue *glue = container_of(cyclic, struct mt8377_glue,
 						    budget_poll);
 
-	if (mt6577_usb_event_poll(glue))
+	if (mt8377_usb_event_poll(glue))
 		return;
-	mt6577_apply_budget(glue);
+	mt8377_apply_budget(glue);
 }
 
-static volatile u32 mt6577_reset_trace[6];
+static volatile u32 mt8377_reset_trace[6];
 
-static int mt6577_resources_off(struct mt6577_glue *glue)
+static int mt8377_resources_off(struct mt8377_glue *glue)
 {
 	int ret;
 
@@ -129,7 +129,7 @@ static int mt6577_resources_off(struct mt6577_glue *glue)
 	return 0;
 }
 
-static int mt6577_resources_on(struct mt6577_glue *glue)
+static int mt8377_resources_on(struct mt8377_glue *glue)
 {
 	int ret, cleanup;
 
@@ -152,15 +152,15 @@ static int mt6577_resources_on(struct mt6577_glue *glue)
 	glue->powered = true;
 	return 0;
 cleanup:
-	cleanup = mt6577_resources_off(glue);
+	cleanup = mt8377_resources_off(glue);
 	return cleanup ? cleanup : ret;
 }
 
-static irqreturn_t mt6577_interrupt(int irq, void *data)
+static irqreturn_t mt8377_interrupt(int irq, void *data)
 {
 	struct musb *musb = data;
-	struct mt6577_glue *glue = container_of(musb->controller,
-						    struct mt6577_glue, dev);
+	struct mt8377_glue *glue = container_of(musb->controller,
+						    struct mt8377_glue, dev);
 	void __iomem *base = musb->mregs;
 	irqreturn_t ret = IRQ_NONE;
 
@@ -182,15 +182,15 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 		musb->int_rx = 0;
 		ret = IRQ_HANDLED;
 	} else if (musb->int_usb & MUSB_INTR_RESET) {
-		mt6577_reset_trace[0]++;
-		mt6577_reset_trace[1] = musb_readb(base, MUSB_FADDR);
-		mt6577_reset_trace[3] = musb_readb(base, MUSB_POWER);
-		mt6577_reset_trace[4] = musb_readb(base, MUSB_DEVCTL);
+		mt8377_reset_trace[0]++;
+		mt8377_reset_trace[1] = musb_readb(base, MUSB_FADDR);
+		mt8377_reset_trace[3] = musb_readb(base, MUSB_POWER);
+		mt8377_reset_trace[4] = musb_readb(base, MUSB_DEVCTL);
 		musb_writeb(base, MUSB_FADDR, 0);
-		mt6577_reset_trace[2] = musb_readb(base, MUSB_FADDR);
+		mt8377_reset_trace[2] = musb_readb(base, MUSB_FADDR);
 		musb_g_reset(musb);
 		musb_ep_select(base, 0);
-		mt6577_reset_trace[5] = musb_readw(musb->endpoints[0].regs,
+		mt8377_reset_trace[5] = musb_readw(musb->endpoints[0].regs,
 						  MUSB_CSR0);
 		musb->int_tx &= 1;
 		musb->int_rx = 0;
@@ -203,46 +203,46 @@ static irqreturn_t mt6577_interrupt(int irq, void *data)
 	return ret;
 }
 
-static int mt6577_init(struct musb *musb)
+static int mt8377_init(struct musb *musb)
 {
 	void __iomem *base = musb->mregs;
 
 	musb_writeb(base, MUSB_POWER, 0);
 	mdelay(20);
-	musb_writew(base, MT6577_SWRST,
-		    musb_readw(base, MT6577_SWRST) | 3);
-	musb_writel(base, MT6577_L1INTM, 7);
-	musb->isr = mt6577_interrupt;
+	musb_writew(base, MT8377_SWRST,
+		    musb_readw(base, MT8377_SWRST) | 3);
+	musb_writel(base, MT8377_L1INTM, 7);
+	musb->isr = mt8377_interrupt;
 	return 0;
 }
 
-static const struct musb_platform_ops mt6577_ops = {
-	.init = mt6577_init,
-	.vbus_draw = mt6577_vbus_draw,
+static const struct musb_platform_ops mt8377_ops = {
+	.init = mt8377_init,
+	.vbus_draw = mt8377_vbus_draw,
 };
 
-static struct musb_fifo_cfg mt6577_fifo[] = {
+static struct musb_fifo_cfg mt8377_fifo[] = {
 	MUSB_EP_FIFO_SINGLE(1, FIFO_TX, 512),
 	MUSB_EP_FIFO_SINGLE(1, FIFO_RX, 512),
 	MUSB_EP_FIFO_SINGLE(2, FIFO_TX, 512),
 	MUSB_EP_FIFO_SINGLE(2, FIFO_RX, 512),
 };
 
-static struct musb_hdrc_config mt6577_config = {
-	.fifo_cfg = mt6577_fifo,
-	.fifo_cfg_size = ARRAY_SIZE(mt6577_fifo),
+static struct musb_hdrc_config mt8377_config = {
+	.fifo_cfg = mt8377_fifo,
+	.fifo_cfg_size = ARRAY_SIZE(mt8377_fifo),
 	.dyn_fifo = true,
 	.num_eps = 3,
 	.ram_bits = 11,
 };
 
-static int mt6577_probe(struct udevice *dev)
+static int mt8377_probe(struct udevice *dev)
 {
-	struct mt6577_glue *glue = dev_get_priv(dev);
+	struct mt8377_glue *glue = dev_get_priv(dev);
 	struct musb_hdrc_platform_data pdata = {
 		.mode = MUSB_PERIPHERAL,
-		.config = &mt6577_config,
-		.platform_ops = &mt6577_ops,
+		.config = &mt8377_config,
+		.platform_ops = &mt8377_ops,
 	};
 	void *base = dev_read_addr_ptr(dev);
 	int ret, cleanup;
@@ -264,11 +264,11 @@ static int mt6577_probe(struct udevice *dev)
 			return ret;
 		glue->budget_ma = 0;
 		glue->budget_pending = true;
-		ret = mt6577_apply_budget(glue);
+		ret = mt8377_apply_budget(glue);
 		if (ret)
 			return ret;
 	}
-	ret = mt6577_resources_on(glue);
+	ret = mt8377_resources_on(glue);
 	if (ret)
 		return ret;
 	glue->musb = musb_init_controller(&pdata, &glue->dev, base);
@@ -281,14 +281,14 @@ static int mt6577_probe(struct udevice *dev)
 		goto free_musb;
 	if (IS_ENABLED(CONFIG_DM_CHARGER) && glue->charger) {
 		ret = charger_set_usb_event_poll(glue->charger,
-						mt6577_usb_event_poll, glue);
+						mt8377_usb_event_poll, glue);
 		if (ret && ret != -ENOSYS) {
 			charger_set_usb_event_poll(glue->charger, NULL, NULL);
 			usb_del_gadget_udc(&glue->musb->g);
 			goto free_musb;
 		}
-		cyclic_register(&glue->budget_poll, mt6577_budget_poll, 1000,
-				"mt6577-usb-budget");
+		cyclic_register(&glue->budget_poll, mt8377_budget_poll, 1000,
+				"mt8377-usb-budget");
 		glue->budget_registered = true;
 	}
 	return 0;
@@ -297,13 +297,13 @@ free_musb:
 	free(glue->musb);
 	glue->musb = NULL;
 disable:
-	cleanup = mt6577_resources_off(glue);
+	cleanup = mt8377_resources_off(glue);
 	return cleanup ? cleanup : ret;
 }
 
-static int mt6577_remove(struct udevice *dev)
+static int mt8377_remove(struct udevice *dev)
 {
-	struct mt6577_glue *glue = dev_get_priv(dev);
+	struct mt8377_glue *glue = dev_get_priv(dev);
 	int ret, cleanup;
 
 	if (glue->budget_busy)
@@ -328,40 +328,41 @@ static int mt6577_remove(struct udevice *dev)
 	}
 	glue->budget_ma = 0;
 	glue->budget_pending = true;
-	ret = mt6577_apply_budget(glue);
+	ret = mt8377_apply_budget(glue);
 	if (ret == -ENODEV)
 		ret = 0;
-	cleanup = mt6577_resources_off(glue);
+	cleanup = mt8377_resources_off(glue);
 	return ret ? ret : cleanup;
 }
 
-static int mt6577_handle_interrupts(struct udevice *dev)
+static int mt8377_handle_interrupts(struct udevice *dev)
 {
-	struct mt6577_glue *glue = dev_get_priv(dev);
+	struct mt8377_glue *glue = dev_get_priv(dev);
 
 	if (!glue->musb)
 		return -ENODEV;
-	mt6577_interrupt(0, glue->musb);
-	mt6577_apply_budget(glue);
+	mt8377_interrupt(0, glue->musb);
+	mt8377_apply_budget(glue);
 	return 0;
 }
 
-static const struct usb_gadget_generic_ops mt6577_gadget_ops = {
-	.handle_interrupts = mt6577_handle_interrupts,
+static const struct usb_gadget_generic_ops mt8377_gadget_ops = {
+	.handle_interrupts = mt8377_handle_interrupts,
 };
 
-static const struct udevice_id mt6577_ids[] = {
+static const struct udevice_id mt8377_ids[] = {
+	{ .compatible = "mediatek,mt8377-musb" },
 	{ .compatible = "mediatek,mt6577-musb" },
 	{ }
 };
 
-U_BOOT_DRIVER(mt6577_musb) = {
-	.name = "mt6577-musb",
+U_BOOT_DRIVER(mt8377_musb) = {
+	.name = "mt8377-musb",
 	.id = UCLASS_USB_GADGET_GENERIC,
-	.of_match = mt6577_ids,
-	.probe = mt6577_probe,
-	.remove = mt6577_remove,
-	.ops = &mt6577_gadget_ops,
-	.priv_auto = sizeof(struct mt6577_glue),
+	.of_match = mt8377_ids,
+	.probe = mt8377_probe,
+	.remove = mt8377_remove,
+	.ops = &mt8377_gadget_ops,
+	.priv_auto = sizeof(struct mt8377_glue),
 	.flags = DM_FLAG_OS_PREPARE,
 };

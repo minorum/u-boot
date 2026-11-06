@@ -48,10 +48,10 @@
 
 #define MSDC_IOCON_DDLSEL		BIT(3)
 
-#define MT6577_DAT_RDDLY0		0xf0
-#define MT6577_DAT_RDDLY1		0xf4
-#define MT6577_ECO_VER		0x104
-#define MT6577_MAX_REQUEST	32768
+#define MT8377_DAT_RDDLY0		0xf0
+#define MT8377_DAT_RDDLY1		0xf4
+#define MT8377_ECO_VER		0x104
+#define MT8377_MAX_REQUEST	32768
 
 /* MSDC_PS */
 #define MSDC_PS_DAT0			BIT(16)
@@ -99,7 +99,7 @@
 #define SDC_RX_ENHANCE_EN		BIT(20)
 
 /* MSDC_DMA_CTRL */
-#define MT6577_DMA_CTRL_SIZE		GENMASK(31, 16)
+#define MT8377_DMA_CTRL_SIZE		GENMASK(31, 16)
 #define MSDC_DMA_CTRL_BURSTSZ		GENMASK(14, 12)
 #define MSDC_DMA_CTRL_LASTBUF		BIT(10)
 #define MSDC_DMA_CTRL_MODE		BIT(8)
@@ -311,7 +311,7 @@ struct msdc_top_regs {
 
 struct msdc_compatible {
 	u8 clk_div_bits;
-	bool mt6577;
+	bool mt8377;
 	bool pad_tune0;
 	bool async_fifo;
 	bool async_fifo_crcsts;
@@ -646,7 +646,7 @@ static bool msdc_cmd_is_ready(struct msdc_host *host, const struct mmc_cmd *cmd)
 	}
 
 	if ((host->last_resp_type == MMC_RSP_R1b || host->last_data_write) &&
-	    (!host->dev_comp->mt6577 || cmd->cmdidx != MMC_CMD_STOP_TRANSMISSION)) {
+	    (!host->dev_comp->mt8377 || cmd->cmdidx != MMC_CMD_STOP_TRANSMISSION)) {
 		ret = readl_poll_timeout(&host->base->msdc_ps, reg,
 					 reg & MSDC_PS_DAT0, 1000000);
 
@@ -747,11 +747,11 @@ static int msdc_pio_read(struct msdc_host *host, u8 *ptr, u32 size)
 {
 	u32 status;
 	u32 chksz;
-	ulong start = host->dev_comp->mt6577 ? get_timer(0) : 0;
+	ulong start = host->dev_comp->mt8377 ? get_timer(0) : 0;
 	int ret = 0;
 
 	while (1) {
-		if (host->dev_comp->mt6577 && get_timer(start) > 5000) {
+		if (host->dev_comp->mt8377 && get_timer(start) > 5000) {
 			ret = -ETIMEDOUT;
 			break;
 		}
@@ -794,11 +794,11 @@ static int msdc_pio_write(struct msdc_host *host, const u8 *ptr, u32 size)
 {
 	u32 status;
 	u32 chksz;
-	ulong start = host->dev_comp->mt6577 ? get_timer(0) : 0;
+	ulong start = host->dev_comp->mt8377 ? get_timer(0) : 0;
 	int ret = 0;
 
 	while (1) {
-		if (host->dev_comp->mt6577 && get_timer(start) > 5000) {
+		if (host->dev_comp->mt8377 && get_timer(start) > 5000) {
 			ret = -ETIMEDOUT;
 			break;
 		}
@@ -867,8 +867,8 @@ static dma_addr_t msdc_flush_membuf(const void *ptr, size_t size, enum dma_data_
 static void msdc_dma_start(struct msdc_host *host, dma_addr_t addr, u32 size)
 {
 	writel((u32)addr, &host->base->dma_sa);
-	if (host->dev_comp->mt6577) {
-		writel(FIELD_PREP(MT6577_DMA_CTRL_SIZE, size) |
+	if (host->dev_comp->mt8377) {
+		writel(FIELD_PREP(MT8377_DMA_CTRL_SIZE, size) |
 		       FIELD_PREP(MSDC_DMA_CTRL_BURSTSZ, 6) |
 		       MSDC_DMA_CTRL_LASTBUF | MSDC_DMA_CTRL_START,
 		       &host->base->dma_ctrl);
@@ -900,7 +900,7 @@ static void msdc_dma_stop(struct msdc_host *host)
 			   !(reg & MSDC_DMA_CFG_STS), 1000000);
 }
 
-static int mt6577_dma_stop(struct msdc_host *host)
+static int mt8377_dma_stop(struct msdc_host *host)
 {
 	struct clk *clock;
 	u32 reg;
@@ -928,7 +928,7 @@ static int msdc_dma_done(struct msdc_host *host, int events)
 	u32 rawcmd, arg;
 
 	if (!(events & MSDC_INT_XFER_COMPL) ||
-	    (host->dev_comp->mt6577 &&
+	    (host->dev_comp->mt8377 &&
 	     (events & (MSDC_INT_DATTMO | MSDC_INT_DATCRCERR)))) {
 		rawcmd = readl(&host->base->sdc_cmd);
 		arg = readl(&host->base->sdc_arg);
@@ -969,13 +969,13 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 	}
 
 	cache_size = size;
-	if (host->dev_comp->mt6577) {
+	if (host->dev_comp->mt8377) {
 		buf = host->dma_buffer;
-		cache_size = MT6577_MAX_REQUEST;
+		cache_size = MT8377_MAX_REQUEST;
 	}
 	cache_addr = (ulong)buf;
 	dma_addr = msdc_flush_membuf(buf, cache_size, dir);
-	if (host->dev_comp->mt6577)
+	if (host->dev_comp->mt8377)
 		dma_addr = map_to_sysmem(buf);
 	msdc_dma_start(host, dma_addr, size);
 
@@ -984,8 +984,8 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 	if (ret)
 		status = MSDC_INT_DATTMO;
 
-	if (host->dev_comp->mt6577) {
-		ret = mt6577_dma_stop(host);
+	if (host->dev_comp->mt8377) {
+		ret = mt8377_dma_stop(host);
 		if (ret)
 			return ret;
 		setbits_le32(&host->base->msdc_cfg, MSDC_CFG_PIO);
@@ -1001,15 +1001,15 @@ static int msdc_dma_transfer(struct msdc_host *host, struct mmc_data *data)
 		invalidate_dcache_range(cache_addr, cache_addr + cache_size);
 
 	ret = msdc_dma_done(host, status);
-	if (!ret && host->dev_comp->mt6577 && data->flags == MMC_DATA_READ)
+	if (!ret && host->dev_comp->mt8377 && data->flags == MMC_DATA_READ)
 		memcpy(data->dest, host->dma_buffer, size);
 	return ret;
 }
 
-static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
+static int mt8377_prepare_data(struct msdc_host *host, struct mmc_data *data)
 {
 	if (!data->blocksize || data->blocksize > 512 ||
-	    !data->blocks || data->blocks > MT6577_MAX_REQUEST / data->blocksize ||
+	    !data->blocks || data->blocks > MT8377_MAX_REQUEST / data->blocksize ||
 	    (data->flags != MMC_DATA_READ && data->flags != MMC_DATA_WRITE) ||
 	    (data->flags == MMC_DATA_READ ? !data->dest : !data->src))
 		return -EINVAL;
@@ -1020,11 +1020,11 @@ static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
 		return 0;
 	}
 	if (!host->dma_buffer) {
-		host->dma_buffer = memalign(ARCH_DMA_MINALIGN, MT6577_MAX_REQUEST);
+		host->dma_buffer = memalign(ARCH_DMA_MINALIGN, MT8377_MAX_REQUEST);
 		if (!host->dma_buffer)
 			return -ENOMEM;
 	}
-	if (map_to_sysmem(host->dma_buffer) > U32_MAX - MT6577_MAX_REQUEST + 1)
+	if (map_to_sysmem(host->dma_buffer) > U32_MAX - MT8377_MAX_REQUEST + 1)
 		return -ERANGE;
 	if (data->flags == MMC_DATA_WRITE)
 		memcpy(host->dma_buffer, data->src, data->blocks * data->blocksize);
@@ -1032,7 +1032,7 @@ static int mt6577_prepare_data(struct msdc_host *host, struct mmc_data *data)
 	return 0;
 }
 
-static void mt6577_finish_request(struct udevice *dev, struct msdc_host *host,
+static void mt8377_finish_request(struct udevice *dev, struct msdc_host *host,
 				  int error, u32 opcode)
 {
 	struct mmc_cmd stop = {
@@ -1064,16 +1064,16 @@ static int msdc_start_data(struct msdc_host *host, struct mmc_data *data)
 		host->last_data_write = 1;
 
 	if (host->dev_comp->use_dma_mode &&
-	    (!host->dev_comp->mt6577 || (!host->dma_disabled && !(data->blocksize % 4))))
+	    (!host->dev_comp->mt8377 || (!host->dma_disabled && !(data->blocksize % 4))))
 		ret = msdc_dma_transfer(host, data);
 	else
 		ret = msdc_pio_transfer(host, data);
 
 	if (ret && !host->dma_error) {
 		cleanup = msdc_reset_hw(host);
-		if (!cleanup || !host->dev_comp->mt6577)
+		if (!cleanup || !host->dev_comp->mt8377)
 			cleanup = msdc_fifo_clr(host);
-		if (host->dev_comp->mt6577 && cleanup)
+		if (host->dev_comp->mt8377 && cleanup)
 			host->dma_error = cleanup;
 	}
 
@@ -1094,8 +1094,8 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	if (host->dma_error)
 		return host->dma_error;
 
-	if (host->dev_comp->mt6577 && data) {
-		data_ret = mt6577_prepare_data(host, data);
+	if (host->dev_comp->mt8377 && data) {
+		data_ret = mt8377_prepare_data(host, data);
 		if (data_ret)
 			return data_ret;
 	}
@@ -1105,15 +1105,15 @@ static int msdc_ops_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	    !(cmd_ret == -EIO &&
 	    (cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK ||
 	    cmd->cmdidx == MMC_CMD_SEND_TUNING_BLOCK_HS200))) {
-		if (host->dev_comp->mt6577 && data)
-			mt6577_finish_request(dev, host, cmd_ret, cmd->cmdidx);
+		if (host->dev_comp->mt8377 && data)
+			mt8377_finish_request(dev, host, cmd_ret, cmd->cmdidx);
 		return cmd_ret;
 	}
 
 	if (data) {
 		data_ret = msdc_start_data(host, data);
-		if (host->dev_comp->mt6577)
-			mt6577_finish_request(dev, host, data_ret, cmd->cmdidx);
+		if (host->dev_comp->mt8377)
+			mt8377_finish_request(dev, host, data_ret, cmd->cmdidx);
 		if (cmd_ret)
 			return cmd_ret;
 		else
@@ -1130,7 +1130,7 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
 
 	host->timeout_ns = ns;
 	host->timeout_clks = clks;
-	if (host->dev_comp->mt6577)
+	if (host->dev_comp->mt8377)
 		shift = 16;
 
 	if (host->sclk == 0) {
@@ -1185,11 +1185,11 @@ static int msdc_set_mclk(struct udevice *dev,
 	u32 reg;
 	int ret;
 
-	if (host->dev_comp->mt6577 &&
+	if (host->dev_comp->mt8377 &&
 	    ((timing != MMC_LEGACY && timing != MMC_HS && timing != MMC_HS_52 && timing != SD_HS) ||
 	     hz > 52000000 || (timing == SD_HS && hz > 50000000)))
 		return -EINVAL;
-	if (host->dev_comp->mt6577 && host->dma_disabled)
+	if (host->dev_comp->mt8377 && host->dma_disabled)
 		hz = min(hz, 12000000U);
 
 	if (!hz) {
@@ -1199,9 +1199,9 @@ static int msdc_set_mclk(struct udevice *dev,
 		return 0;
 	}
 
-	if (!host->dev_comp->mt6577 && host->dev_comp->clk_div_bits == 8)
+	if (!host->dev_comp->mt8377 && host->dev_comp->clk_div_bits == 8)
 		clrbits_le32(&host->base->msdc_cfg, MSDC_CFG_HS400_CK_MODE);
-	else if (!host->dev_comp->mt6577)
+	else if (!host->dev_comp->mt8377)
 		clrbits_le32(&host->base->msdc_cfg,
 			     MSDC_CFG_HS400_CK_MODE_EXT);
 
@@ -1315,7 +1315,7 @@ static int msdc_ops_set_ios(struct udevice *dev)
 	if (host->dma_error)
 		return host->dma_error;
 
-	if (host->dev_comp->mt6577 &&
+	if (host->dev_comp->mt8377 &&
 	    mmc->signal_voltage != MMC_SIGNAL_VOLTAGE_000 &&
 	    mmc->signal_voltage != MMC_SIGNAL_VOLTAGE_330)
 		return -EINVAL;
@@ -1814,13 +1814,13 @@ tune_done:
 }
 #endif
 
-static int mt6577_init_hw(struct msdc_host *host)
+static int mt8377_init_hw(struct msdc_host *host)
 {
 	void __iomem *base = host->base;
 	u32 val;
 	int ret;
 
-	if (readl(base + MT6577_ECO_VER) != 4)
+	if (readl(base + MT8377_ECO_VER) != 4)
 		return -ENODEV;
 
 	clrsetbits_le32(&host->base->msdc_cfg, MSDC_CFG_CKPDN,
@@ -1847,8 +1847,8 @@ static int mt6577_init_hw(struct msdc_host *host)
 	writel(DATA_INTS_MASK | CMD_INTS_MASK, &host->base->msdc_inten);
 	writel(0, &host->base->pad_tune);
 	writel(MSDC_IOCON_DDLSEL, &host->base->msdc_iocon);
-	writel(0, base + MT6577_DAT_RDDLY0);
-	writel(0, base + MT6577_DAT_RDDLY1);
+	writel(0, base + MT8377_DAT_RDDLY0);
+	writel(0, base + MT8377_DAT_RDDLY1);
 	writel(0x403c004f, &host->base->patch_bit0);
 	clrsetbits_le32(&host->base->sdc_cfg,
 			SDC_CFG_BUSWIDTH | SDC_CFG_SDIOIDE | SDC_CFG_DTOC,
@@ -2108,8 +2108,8 @@ static int msdc_drv_probe(struct udevice *dev)
 		cfg->f_max = host->src_clk_freq;
 
 	cfg->b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
-	if (host->dev_comp->mt6577)
-		cfg->b_max = min(cfg->b_max, MT6577_MAX_REQUEST / 512U);
+	if (host->dev_comp->mt8377)
+		cfg->b_max = min(cfg->b_max, MT8377_MAX_REQUEST / 512U);
 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
 
 	host->mmc = &plat->mmc;
@@ -2120,8 +2120,8 @@ static int msdc_drv_probe(struct udevice *dev)
 	pinctrl_select_state(dev, "default");
 #endif
 
-	if (host->dev_comp->mt6577) {
-		ret = mt6577_init_hw(host);
+	if (host->dev_comp->mt8377) {
+		ret = mt8377_init_hw(host);
 		if (ret)
 			goto disable;
 	} else {
@@ -2207,7 +2207,7 @@ static int msdc_of_to_plat(struct udevice *dev)
 		return ret;
 
 	ret = clk_get_by_name(dev, "hclk", &host->h_clk);
-	if (ret < 0 && !host->dev_comp->mt6577)
+	if (ret < 0 && !host->dev_comp->mt8377)
 		return ret;
 
 	clk_get_by_name(dev, "source_cg", &host->src_clk_cg); /* optional */
@@ -2279,9 +2279,9 @@ static const struct dm_mmc_ops msdc_ops = {
 	.wait_dat0 = msdc_ops_wait_dat0,
 };
 
-static const struct msdc_compatible mt6577_compat = {
+static const struct msdc_compatible mt8377_compat = {
 	.clk_div_bits = 8,
-	.mt6577 = true,
+	.mt8377 = true,
 	.use_dma_mode = true,
 };
 
@@ -2401,7 +2401,8 @@ static const struct msdc_compatible mt8189_compat = {
 };
 
 static const struct udevice_id msdc_ids[] = {
-	{ .compatible = "mediatek,mt6577-mmc", .data = (ulong)&mt6577_compat },
+	{ .compatible = "mediatek,mt8377-mmc", .data = (ulong)&mt8377_compat },
+	{ .compatible = "mediatek,mt6577-mmc", .data = (ulong)&mt8377_compat },
 	{ .compatible = "mediatek,mt7620-mmc", .data = (ulong)&mt7620_compat },
 	{ .compatible = "mediatek,mt7621-mmc", .data = (ulong)&mt7621_compat },
 	{ .compatible = "mediatek,mt7622-mmc", .data = (ulong)&mt7622_compat },

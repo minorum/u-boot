@@ -30,7 +30,7 @@
 #define DPI_GMC_CNTL		0x90
 #define DPI_TMODE		0x94
 
-struct mt6577_dpi {
+struct mt8377_dpi {
 	void __iomem *regs;
 	struct regmap *mmsys;
 	struct clk clocks[3];
@@ -40,7 +40,7 @@ struct mt6577_dpi {
 	bool pll_enabled;
 };
 
-static void mt6577_dpi_configure(struct mt6577_dpi *dpi,
+static void mt8377_dpi_configure(struct mt8377_dpi *dpi,
 				 const struct display_timing *t,
 				 unsigned int div, u32 fb)
 {
@@ -78,7 +78,7 @@ static void mt6577_dpi_configure(struct mt6577_dpi *dpi,
 	writel(t->hactive.typ * 2, dpi->regs + DPI_FB_PITCH);
 }
 
-static int mt6577_dpi_stop(struct mt6577_dpi *dpi)
+static int mt8377_dpi_stop(struct mt8377_dpi *dpi)
 {
 	struct clk *engine;
 	int ret;
@@ -107,7 +107,7 @@ static int mt6577_dpi_stop(struct mt6577_dpi *dpi)
 	return 0;
 }
 
-static int mt6577_dpi_clock(struct mt6577_dpi *dpi, unsigned long rate,
+static int mt8377_dpi_clock(struct mt8377_dpi *dpi, unsigned long rate,
 			    unsigned long *pll_rate)
 {
 	unsigned long best_error = ULONG_MAX;
@@ -135,7 +135,7 @@ static int mt6577_dpi_clock(struct mt6577_dpi *dpi, unsigned long rate,
 	return best_div;
 }
 
-static int mt6577_dpi_validate(const struct display_timing *t)
+static int mt8377_dpi_validate(const struct display_timing *t)
 {
 	const unsigned int porches[] = {
 		t->hfront_porch.typ, t->hsync_len.typ, t->hback_porch.typ,
@@ -156,12 +156,12 @@ static int mt6577_dpi_validate(const struct display_timing *t)
 	return 0;
 }
 
-static int mt6577_dpi_probe(struct udevice *dev)
+static int mt8377_dpi_probe(struct udevice *dev)
 {
 	static const char * const names[] = { "larb-emi", "larb", "engine" };
 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	struct video_priv *video = dev_get_uclass_priv(dev);
-	struct mt6577_dpi *dpi = dev_get_priv(dev);
+	struct mt8377_dpi *dpi = dev_get_priv(dev);
 	struct display_timing timing;
 	unsigned long pll_rate;
 	ofnode remote;
@@ -188,10 +188,10 @@ static int mt6577_dpi_probe(struct udevice *dev)
 	ret = panel_get_display_timing(dpi->panel, &timing);
 	if (ret)
 		goto fail;
-	ret = mt6577_dpi_validate(&timing);
+	ret = mt8377_dpi_validate(&timing);
 	if (ret)
 		goto fail;
-	div = mt6577_dpi_clock(dpi, timing.pixelclock.typ, &pll_rate);
+	div = mt8377_dpi_clock(dpi, timing.pixelclock.typ, &pll_rate);
 	if (div < 0) {
 		ret = div;
 		goto fail;
@@ -215,7 +215,7 @@ static int mt6577_dpi_probe(struct udevice *dev)
 		goto fail;
 	memset((void *)plat->base, 0, plat->size);
 	flush_dcache_range(plat->base, plat->base + ALIGN(plat->size, ARCH_DMA_MINALIGN));
-	mt6577_dpi_configure(dpi, &timing, div, plat->base);
+	mt8377_dpi_configure(dpi, &timing, div, plat->base);
 	writel(1, dpi->regs + DPI_EN);
 	ret = panel_enable_backlight(dpi->panel);
 	if (ret)
@@ -227,27 +227,27 @@ static int mt6577_dpi_probe(struct udevice *dev)
 	return 0;
 
 fail:
-	cleanup = mt6577_dpi_stop(dpi);
+	cleanup = mt8377_dpi_stop(dpi);
 	if (cleanup)
 		hang();
 	cleanup = device_remove(dpi->panel, DM_REMOVE_NORMAL);
 	return cleanup ? cleanup : ret;
 }
 
-static int mt6577_dpi_remove(struct udevice *dev)
+static int mt8377_dpi_remove(struct udevice *dev)
 {
-	struct mt6577_dpi *dpi = dev_get_priv(dev);
+	struct mt8377_dpi *dpi = dev_get_priv(dev);
 	int ret;
 
 	ret = panel_set_backlight(dpi->panel, 0);
-	if (mt6577_dpi_stop(dpi))
+	if (mt8377_dpi_stop(dpi))
 		hang();
 	if (ret)
 		return ret;
 	return device_remove(dpi->panel, DM_REMOVE_NORMAL);
 }
 
-static int mt6577_dpi_bind(struct udevice *dev)
+static int mt8377_dpi_bind(struct udevice *dev)
 {
 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 
@@ -255,18 +255,19 @@ static int mt6577_dpi_bind(struct udevice *dev)
 	return 0;
 }
 
-static const struct udevice_id mt6577_dpi_ids[] = {
+static const struct udevice_id mt8377_dpi_ids[] = {
+	{ .compatible = "mediatek,mt8377-dpi" },
 	{ .compatible = "mediatek,mt6577-dpi" },
 	{ }
 };
 
-U_BOOT_DRIVER(mt6577_dpi) = {
-	.name = "mt6577_dpi",
+U_BOOT_DRIVER(mt8377_dpi) = {
+	.name = "mt8377_dpi",
 	.id = UCLASS_VIDEO,
-	.of_match = mt6577_dpi_ids,
-	.bind = mt6577_dpi_bind,
-	.probe = mt6577_dpi_probe,
-	.remove = mt6577_dpi_remove,
+	.of_match = mt8377_dpi_ids,
+	.bind = mt8377_dpi_bind,
+	.probe = mt8377_dpi_probe,
+	.remove = mt8377_dpi_remove,
 	.flags = DM_FLAG_PRE_RELOC | DM_FLAG_OS_PREPARE,
-	.priv_auto = sizeof(struct mt6577_dpi),
+	.priv_auto = sizeof(struct mt8377_dpi),
 };

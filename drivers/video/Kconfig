@@ -302,8 +302,8 @@ config PANEL
 	help
 	  This provides panel uclass driver that enables basic panel support.
 
-config VIDEO_MT6577
-	bool "MediaTek MT6577 DPI display controller"
+config VIDEO_MT8377
+	bool "MediaTek MT8377 DPI display controller"
 	depends on ARCH_MEDIATEK && CLK && REGMAP && PANEL
 	help
 	  Native RGB565 scanout for displays up to 1024 by 768 pixels.

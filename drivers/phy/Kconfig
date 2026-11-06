@@ -350,12 +350,12 @@ source "drivers/phy/qcom/Kconfig"
 source "drivers/phy/renesas/Kconfig"
 source "drivers/phy/starfive/Kconfig"
 
-config PHY_MT6577_USB
-	bool "MediaTek MT6577 USB PHY"
+config PHY_MT8377_USB
+	bool "MediaTek MT8377 USB PHY"
 	depends on PHY && CLK && DM_REGULATOR && DM_PMIC
 	select DM_CHARGER
 	help
-	  Enable the USB 2.0 PHY on MediaTek MT6577 systems.
+	  Enable the USB 2.0 PHY on MediaTek MT8377 systems.
 	  The driver manages UPLL and bus clocks, the VUSB supply,
 	  slew calibration and the save-current sequence. It supports
 	  peripheral mode and rejects unusable clock selections.

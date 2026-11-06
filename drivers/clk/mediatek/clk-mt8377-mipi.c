@@ -11,20 +11,20 @@
 #include <linux/clk-provider.h>
 #include <linux/delay.h>
 
-#define MT6577_MIPI_CON0		0x00
-#define MT6577_MIPI_CON1		0x04
-#define MT6577_MIPI_CON3		0x0c
-#define MT6577_MIPI_CON6		0x18
-#define MT6577_MIPI_CON9		0x24
-#define MT6577_MIPI_PLL_EN	BIT(0)
-#define MT6577_MIPI_CLKR_EN	BIT(1)
-#define MT6577_MIPI_DPI_EN	BIT(5)
-#define MT6577_MIPI_DIV1		GENMASK(6, 0)
-#define MT6577_MIPI_DIV2		GENMASK(11, 8)
-#define MT6577_MIPI_ENABLE	(MT6577_MIPI_PLL_EN | MT6577_MIPI_CLKR_EN | \
-				 MT6577_MIPI_DPI_EN)
+#define MT8377_MIPI_CON0		0x00
+#define MT8377_MIPI_CON1		0x04
+#define MT8377_MIPI_CON3		0x0c
+#define MT8377_MIPI_CON6		0x18
+#define MT8377_MIPI_CON9		0x24
+#define MT8377_MIPI_PLL_EN	BIT(0)
+#define MT8377_MIPI_CLKR_EN	BIT(1)
+#define MT8377_MIPI_DPI_EN	BIT(5)
+#define MT8377_MIPI_DIV1		GENMASK(6, 0)
+#define MT8377_MIPI_DIV2		GENMASK(11, 8)
+#define MT8377_MIPI_ENABLE	(MT8377_MIPI_PLL_EN | MT8377_MIPI_CLKR_EN | \
+				 MT8377_MIPI_DPI_EN)
 
-struct mt6577_mipi {
+struct mt8377_mipi {
 	struct clk clk;
 	void __iomem *base;
 	struct clk parent;
@@ -37,10 +37,10 @@ struct mt6577_mipi {
 	bool enabled;
 };
 
-static ulong mt6577_mipi_get_rate(struct clk *clk)
+static ulong mt8377_mipi_get_rate(struct clk *clk)
 {
-	struct mt6577_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
-					       struct mt6577_mipi, clk);
+	struct mt8377_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
+					       struct mt8377_mipi, clk);
 	ulong parent = clk_get_rate(&mipi->parent);
 	u64 rate;
 
@@ -53,10 +53,10 @@ static ulong mt6577_mipi_get_rate(struct clk *clk)
 	return rate <= ULONG_MAX ? rate : 0;
 }
 
-static ulong mt6577_mipi_round_rate(struct clk *clk, ulong requested)
+static ulong mt8377_mipi_round_rate(struct clk *clk, ulong requested)
 {
-	struct mt6577_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
-					       struct mt6577_mipi, clk);
+	struct mt8377_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
+					       struct mt8377_mipi, clk);
 	ulong parent = clk_get_rate(&mipi->parent);
 	u64 rate;
 
@@ -70,11 +70,11 @@ static ulong mt6577_mipi_round_rate(struct clk *clk, ulong requested)
 	return rate;
 }
 
-static ulong mt6577_mipi_set_rate(struct clk *clk, ulong rate)
+static ulong mt8377_mipi_set_rate(struct clk *clk, ulong rate)
 {
-	struct mt6577_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
-					       struct mt6577_mipi, clk);
-	ulong fixed = mt6577_mipi_round_rate(clk, rate);
+	struct mt8377_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
+					       struct mt8377_mipi, clk);
+	ulong fixed = mt8377_mipi_round_rate(clk, rate);
 
 	if (mipi->enabled)
 		return -EBUSY;
@@ -88,10 +88,10 @@ static ulong mt6577_mipi_set_rate(struct clk *clk, ulong rate)
 	return rate;
 }
 
-static int mt6577_mipi_enable(struct clk *clk)
+static int mt8377_mipi_enable(struct clk *clk)
 {
-	struct mt6577_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
-					       struct mt6577_mipi, clk);
+	struct mt8377_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
+					       struct mt8377_mipi, clk);
 	u32 val, old_apmixed, old_mmsys, old_infra;
 	u32 old_control, old_divider, old_reference, old_bias;
 	u16 old_ldo;
@@ -112,11 +112,11 @@ static int mt6577_mipi_enable(struct clk *clk)
 	ret = regmap_read(mipi->mmsys, 0x858, &old_mmsys);
 	if (ret)
 		return ret;
-	old_control = readl(mipi->base + MT6577_MIPI_CON0);
-	old_divider = readl(mipi->base + MT6577_MIPI_CON1);
-	old_reference = readl(mipi->base + MT6577_MIPI_CON3);
-	old_bias = readl(mipi->base + MT6577_MIPI_CON6);
-	old_ldo = readw(mipi->base + MT6577_MIPI_CON9);
+	old_control = readl(mipi->base + MT8377_MIPI_CON0);
+	old_divider = readl(mipi->base + MT8377_MIPI_CON1);
+	old_reference = readl(mipi->base + MT8377_MIPI_CON3);
+	old_bias = readl(mipi->base + MT8377_MIPI_CON6);
+	old_ldo = readw(mipi->base + MT8377_MIPI_CON9);
 
 	ret = regmap_update_bits(mipi->apmixed, 0x44, BIT(4), BIT(4));
 	if (ret)
@@ -127,14 +127,14 @@ static int mt6577_mipi_enable(struct clk *clk)
 	ret = regmap_update_bits(mipi->infra, 0x890, BIT(4), 0);
 	if (ret)
 		goto restore_infra;
-	writel(old_reference & ~GENMASK(3, 2), mipi->base + MT6577_MIPI_CON3);
-	val = (old_divider & ~(MT6577_MIPI_DIV1 | MT6577_MIPI_DIV2)) |
-		FIELD_PREP(MT6577_MIPI_DIV1, mipi->div1) |
-		FIELD_PREP(MT6577_MIPI_DIV2, mipi->div2);
-	writel(val, mipi->base + MT6577_MIPI_CON1);
-	writel(old_control | MT6577_MIPI_ENABLE, mipi->base + MT6577_MIPI_CON0);
-	writel(old_bias | GENMASK(1, 0), mipi->base + MT6577_MIPI_CON6);
-	writew(0x4008, mipi->base + MT6577_MIPI_CON9);
+	writel(old_reference & ~GENMASK(3, 2), mipi->base + MT8377_MIPI_CON3);
+	val = (old_divider & ~(MT8377_MIPI_DIV1 | MT8377_MIPI_DIV2)) |
+		FIELD_PREP(MT8377_MIPI_DIV1, mipi->div1) |
+		FIELD_PREP(MT8377_MIPI_DIV2, mipi->div2);
+	writel(val, mipi->base + MT8377_MIPI_CON1);
+	writel(old_control | MT8377_MIPI_ENABLE, mipi->base + MT8377_MIPI_CON0);
+	writel(old_bias | GENMASK(1, 0), mipi->base + MT8377_MIPI_CON6);
+	writew(0x4008, mipi->base + MT8377_MIPI_CON9);
 	ret = regmap_update_bits(mipi->infra, 0x890, BIT(8), BIT(8));
 	if (ret)
 		goto restore_phy;
@@ -143,11 +143,11 @@ static int mt6577_mipi_enable(struct clk *clk)
 	return 0;
 
 restore_phy:
-	writel(old_control, mipi->base + MT6577_MIPI_CON0);
-	writel(old_divider, mipi->base + MT6577_MIPI_CON1);
-	writel(old_reference, mipi->base + MT6577_MIPI_CON3);
-	writel(old_bias, mipi->base + MT6577_MIPI_CON6);
-	writew(old_ldo, mipi->base + MT6577_MIPI_CON9);
+	writel(old_control, mipi->base + MT8377_MIPI_CON0);
+	writel(old_divider, mipi->base + MT8377_MIPI_CON1);
+	writel(old_reference, mipi->base + MT8377_MIPI_CON3);
+	writel(old_bias, mipi->base + MT8377_MIPI_CON6);
+	writew(old_ldo, mipi->base + MT8377_MIPI_CON9);
 restore_infra:
 	regmap_update_bits(mipi->infra, 0x890, BIT(4) | BIT(8), old_infra);
 	regmap_update_bits(mipi->mmsys, 0x858, GENMASK(15, 0), old_mmsys);
@@ -156,11 +156,11 @@ restore_apmixed:
 	return ret;
 }
 
-static int mt6577_mipi_disable(struct clk *clk)
+static int mt8377_mipi_disable(struct clk *clk)
 {
-	struct mt6577_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
-					       struct mt6577_mipi, clk);
-	u32 val, infra, mask = MT6577_MIPI_PLL_EN | MT6577_MIPI_DPI_EN;
+	struct mt8377_mipi *mipi = container_of(dev_get_clk_ptr(clk->dev),
+					       struct mt8377_mipi, clk);
+	u32 val, infra, mask = MT8377_MIPI_PLL_EN | MT8377_MIPI_DPI_EN;
 	bool rx_active;
 	int ret;
 
@@ -171,17 +171,17 @@ static int mt6577_mipi_disable(struct clk *clk)
 		return ret;
 	rx_active = infra & BIT(12);
 	if (!rx_active)
-		mask |= MT6577_MIPI_CLKR_EN;
-	val = readl(mipi->base + MT6577_MIPI_CON0);
-	writel(val & ~mask, mipi->base + MT6577_MIPI_CON0);
-	writew(readw(mipi->base + MT6577_MIPI_CON9) & ~BIT(3),
-	       mipi->base + MT6577_MIPI_CON9);
+		mask |= MT8377_MIPI_CLKR_EN;
+	val = readl(mipi->base + MT8377_MIPI_CON0);
+	writel(val & ~mask, mipi->base + MT8377_MIPI_CON0);
+	writew(readw(mipi->base + MT8377_MIPI_CON9) & ~BIT(3),
+	       mipi->base + MT8377_MIPI_CON9);
 	ret = regmap_update_bits(mipi->infra, 0x890, BIT(8), 0);
 	if (ret)
 		return ret;
 	if (!rx_active) {
-		val = readl(mipi->base + MT6577_MIPI_CON6);
-		writel(val & ~GENMASK(1, 0), mipi->base + MT6577_MIPI_CON6);
+		val = readl(mipi->base + MT8377_MIPI_CON6);
+		writel(val & ~GENMASK(1, 0), mipi->base + MT8377_MIPI_CON6);
 		ret = regmap_update_bits(mipi->infra, 0x890, BIT(4), BIT(4));
 		if (ret)
 			return ret;
@@ -193,23 +193,23 @@ static int mt6577_mipi_disable(struct clk *clk)
 	return 0;
 }
 
-static const struct clk_ops mt6577_mipi_pll_ops = {
-	.get_rate = mt6577_mipi_get_rate,
-	.round_rate = mt6577_mipi_round_rate,
-	.set_rate = mt6577_mipi_set_rate,
-	.enable = mt6577_mipi_enable,
-	.disable = mt6577_mipi_disable,
+static const struct clk_ops mt8377_mipi_pll_ops = {
+	.get_rate = mt8377_mipi_get_rate,
+	.round_rate = mt8377_mipi_round_rate,
+	.set_rate = mt8377_mipi_set_rate,
+	.enable = mt8377_mipi_enable,
+	.disable = mt8377_mipi_disable,
 };
 
-U_BOOT_DRIVER(mt6577_mipi_pll) = {
-	.name = "mt6577_mipi_pll",
+U_BOOT_DRIVER(mt8377_mipi_pll) = {
+	.name = "mt8377_mipi_pll",
 	.id = UCLASS_CLK,
-	.ops = &mt6577_mipi_pll_ops,
+	.ops = &mt8377_mipi_pll_ops,
 };
 
-static int mt6577_mipi_probe(struct udevice *dev)
+static int mt8377_mipi_probe(struct udevice *dev)
 {
-	struct mt6577_mipi *mipi = dev_get_priv(dev);
+	struct mt8377_mipi *mipi = dev_get_priv(dev);
 	const char * const names[] = {
 		"mediatek,mmsys", "mediatek,apmixedsys", "mediatek,infracfg",
 	};
@@ -236,17 +236,17 @@ static int mt6577_mipi_probe(struct udevice *dev)
 		if (ret)
 			goto free_maps;
 	}
-	val = readl(mipi->base + MT6577_MIPI_CON1);
-	mipi->div1 = FIELD_GET(MT6577_MIPI_DIV1, val);
-	mipi->div2 = FIELD_GET(MT6577_MIPI_DIV2, val);
-	mipi->reference = readl(mipi->base + MT6577_MIPI_CON3) & GENMASK(3, 2);
+	val = readl(mipi->base + MT8377_MIPI_CON1);
+	mipi->div1 = FIELD_GET(MT8377_MIPI_DIV1, val);
+	mipi->div2 = FIELD_GET(MT8377_MIPI_DIV2, val);
+	mipi->reference = readl(mipi->base + MT8377_MIPI_CON3) & GENMASK(3, 2);
 	if (parent->id) {
 		ret = clk_get_by_id(parent->id, &parent);
 		if (ret)
 			goto free_maps;
 	}
 	mipi->clk.flags = CLK_GET_RATE_NOCACHE;
-	ret = clk_register(&mipi->clk, "mt6577_mipi_pll", "mt6577_mipi_dpi", parent->dev->name);
+	ret = clk_register(&mipi->clk, "mt8377_mipi_pll", "mt8377_mipi_dpi", parent->dev->name);
 	if (ret)
 		goto free_maps;
 	dev_clk_dm(dev, 0, &mipi->clk);
@@ -260,9 +260,9 @@ free_maps:
 	return ret;
 }
 
-static int mt6577_mipi_remove(struct udevice *dev)
+static int mt8377_mipi_remove(struct udevice *dev)
 {
-	struct mt6577_mipi *mipi = dev_get_priv(dev);
+	struct mt8377_mipi *mipi = dev_get_priv(dev);
 
 	int ret;
 
@@ -280,7 +280,7 @@ static int mt6577_mipi_remove(struct udevice *dev)
 	return 0;
 }
 
-static int mt6577_mipi_of_xlate(struct clk *clk, struct ofnode_phandle_args *args)
+static int mt8377_mipi_of_xlate(struct clk *clk, struct ofnode_phandle_args *args)
 {
 	if (args->args_count)
 		return -EINVAL;
@@ -289,7 +289,7 @@ static int mt6577_mipi_of_xlate(struct clk *clk, struct ofnode_phandle_args *arg
 	return 0;
 }
 
-static ulong mt6577_mipi_provider_round(struct clk *clk, ulong rate)
+static ulong mt8377_mipi_provider_round(struct clk *clk, ulong rate)
 {
 	struct clk *pll;
 	int ret;
@@ -300,26 +300,27 @@ static ulong mt6577_mipi_provider_round(struct clk *clk, ulong rate)
 	return clk_round_rate(pll, rate);
 }
 
-static const struct clk_ops mt6577_mipi_ops = {
-	.of_xlate = mt6577_mipi_of_xlate,
+static const struct clk_ops mt8377_mipi_ops = {
+	.of_xlate = mt8377_mipi_of_xlate,
 	.get_rate = ccf_clk_get_rate,
-	.round_rate = mt6577_mipi_provider_round,
+	.round_rate = mt8377_mipi_provider_round,
 	.set_rate = ccf_clk_set_rate,
 	.enable = ccf_clk_enable,
 	.disable = ccf_clk_disable,
 };
 
-static const struct udevice_id mt6577_mipi_ids[] = {
+static const struct udevice_id mt8377_mipi_ids[] = {
+	{ .compatible = "mediatek,mt8377-mipi-tx" },
 	{ .compatible = "mediatek,mt6577-mipi-tx" },
 	{ }
 };
 
-U_BOOT_DRIVER(mt6577_mipi_clock) = {
-	.name = "mt6577_mipi_clock",
+U_BOOT_DRIVER(mt8377_mipi_clock) = {
+	.name = "mt8377_mipi_clock",
 	.id = UCLASS_CLK,
-	.of_match = mt6577_mipi_ids,
-	.probe = mt6577_mipi_probe,
-	.remove = mt6577_mipi_remove,
-	.ops = &mt6577_mipi_ops,
-	.priv_auto = sizeof(struct mt6577_mipi),
+	.of_match = mt8377_mipi_ids,
+	.probe = mt8377_mipi_probe,
+	.remove = mt8377_mipi_remove,
+	.ops = &mt8377_mipi_ops,
+	.priv_auto = sizeof(struct mt8377_mipi),
 };

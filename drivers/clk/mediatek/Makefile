@@ -3,8 +3,8 @@
 obj-$(CONFIG_ARCH_MEDIATEK) += clk-mtk.o
 
 # SoC Drivers
-obj-$(CONFIG_TARGET_MT6577) += clk-mt6577.o
-obj-$(CONFIG_TARGET_MT6577) += clk-mt6577-mm.o clk-mt6577-mipi.o
+obj-$(CONFIG_TARGET_MT8377) += clk-mt8377.o
+obj-$(CONFIG_TARGET_MT8377) += clk-mt8377-mm.o clk-mt8377-mipi.o
 obj-$(CONFIG_TARGET_MT7623) += clk-mt7623.o
 obj-$(CONFIG_TARGET_MT7622) += clk-mt7622.o
 obj-$(CONFIG_TARGET_MT7629) += clk-mt7629.o

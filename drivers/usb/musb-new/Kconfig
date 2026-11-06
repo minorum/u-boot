@@ -68,13 +68,13 @@ config USB_MUSB_MT85XX
 	  DMA controllers are ignored. This driver follow musb-new
 	  driver and usb gadget framework.
 
-config USB_MUSB_MT6577
-	bool "MT6577 USB gadget"
-	depends on TARGET_MT6577 && DM_USB_GADGET && USB_MUSB_GADGET && PHY && CLK
+config USB_MUSB_MT8377
+	bool "MT8377 USB gadget"
+	depends on TARGET_MT8377 && DM_USB_GADGET && USB_MUSB_GADGET && PHY && CLK
 	select USB_MUSB_PIO_ONLY
 	select CYCLIC if DM_CHARGER
 	help
-	  Enable the MT6577 MUSB controller as a USB peripheral.
+	  Enable the MT8377 MUSB controller as a USB peripheral.
 	  The driver uses PIO transfers and requires a clock provider
 	  and a generic USB PHY with its analog supply.
 	  Controller removal releases these resources.

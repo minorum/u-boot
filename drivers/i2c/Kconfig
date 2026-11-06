@@ -299,11 +299,11 @@ config SYS_I2C_MESON
 	  internal buffer holding up to 8 bytes for transfers and supports
 	  both 7-bit and 10-bit addresses.
 
-config SYS_I2C_MT6577_DUAL
-	bool "MediaTek MT6577 FIFO I2C"
+config SYS_I2C_MT8377_DUAL
+	bool "MediaTek MT8377 FIFO I2C"
 	depends on DM_I2C && CLK
 	help
-	  Enable byte-data PIO transfers on MT6577 I2C and dual I2C channel1.
+	  Enable byte-data PIO transfers on MT8377 I2C and dual I2C channel1.
 
 config SYS_I2C_MTK
 	bool "MediaTek I2C driver"

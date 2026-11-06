@@ -1070,7 +1070,7 @@ dtb-$(CONFIG_SOC_K3_AM62P5) += k3-am62p5-r5-sk.dtb \
 mt8371-genio-520-evk-ufs-dtbs := mt8371-genio-520-evk.dtb mt8371-genio-common-ufs.dtbo
 mt8391-genio-720-evk-ufs-dtbs := mt8391-genio-720-evk.dtb mt8371-genio-common-ufs.dtbo
 
-dtb-$(CONFIG_TARGET_MT6577) += mt6577-modecom-freetab8001-ram.dtb
+dtb-$(CONFIG_TARGET_MT8377) += mt8377-modecom-freetab8001-ram.dtb
 
 dtb-$(CONFIG_ARCH_MEDIATEK) += \
 	mt7622-rfb.dtb \

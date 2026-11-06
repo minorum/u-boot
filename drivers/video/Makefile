@@ -92,7 +92,7 @@ obj-$(CONFIG_VIDEO_SEPS525) += seps525.o
 obj-$(CONFIG_VIDEO_ZYNQMP_DPSUB) += zynqmp/
 
 obj-y += bridge/
-obj-$(CONFIG_VIDEO_MT6577) += mt6577_dpi.o
+obj-$(CONFIG_VIDEO_MT8377) += mt8377_dpi.o
 obj-$(CONFIG_PANEL_MODECOM_FREETAB8001) += panel-modecom-freetab8001.o
 obj-y += sunxi/
 obj-y += tegra/

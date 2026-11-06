@@ -418,16 +418,16 @@ R:	GSS_MTK_Uboot_upstream <GSS_MTK_Uboot_upstream@mediatek.com>
 T:	git https://git.u-boot-project.org/u-boot/custodians/u-boot-mediatek.git
 S:	Maintained
 F:	arch/arm/dts/mt*
-F:	drivers/clk/mediatek/clk-mt6577*.c
-F:	drivers/video/mt6577_dpi.c
+F:	drivers/clk/mediatek/clk-mt8377*.c
+F:	drivers/video/mt8377_dpi.c
 F:	drivers/video/panel-modecom-freetab8001.c
-F:	drivers/phy/phy-mt6577-usb.c
-F:	drivers/pinctrl/mediatek/pinctrl-mt6577.c
+F:	drivers/phy/phy-mt8377-usb.c
+F:	drivers/pinctrl/mediatek/pinctrl-mt8377.c
 F:	drivers/power/domain/mt*
 F:	drivers/power/regulator/mt*.c
 F:	drivers/usb/mtu3/
-F:	drivers/usb/musb-new/mt6577.c
-F:	include/dt-bindings/pinctrl/mt6577-pinfunc.h
+F:	drivers/usb/musb-new/mt8377.c
+F:	include/dt-bindings/pinctrl/mt8377-pinfunc.h
 F:	include/power/mt*.h
 N:	mediatek
 N:	mtk

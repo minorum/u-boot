@@ -3,40 +3,40 @@
 
 #include "pinctrl-mtk-common.h"
 
-static const struct mtk_pin_field_calc mt6577_pin_mode_range[] = {
+static const struct mtk_pin_field_calc mt8377_pin_mode_range[] = {
 	PIN_FIELD_CALC(0, 231, 0xc00, 0x10, 0, 3, 15, false),
 };
 
-static const struct mtk_pin_field_calc mt6577_pin_dir_range[] = {
+static const struct mtk_pin_field_calc mt8377_pin_dir_range[] = {
 	PIN_FIELD_CALC(0, 231, 0x000, 0x10, 0, 1, 16, false),
 };
 
-static const struct mtk_pin_field_calc mt6577_pin_do_range[] = {
+static const struct mtk_pin_field_calc mt8377_pin_do_range[] = {
 	PIN_FIELD_CALC(0, 231, 0x800, 0x10, 0, 1, 16, false),
 };
 
-static const struct mtk_pin_field_calc mt6577_pin_di_range[] = {
+static const struct mtk_pin_field_calc mt8377_pin_di_range[] = {
 	PIN_FIELD_CALC(0, 231, 0xa00, 0x10, 0, 1, 16, false),
 };
 
-static const struct mtk_pin_field_calc mt6577_pin_pullen_range[] = {
+static const struct mtk_pin_field_calc mt8377_pin_pullen_range[] = {
 	PIN_FIELD_CALC(0, 231, 0x200, 0x10, 0, 1, 16, false),
 };
 
-static const struct mtk_pin_field_calc mt6577_pin_pullsel_range[] = {
+static const struct mtk_pin_field_calc mt8377_pin_pullsel_range[] = {
 	PIN_FIELD_CALC(0, 231, 0x400, 0x10, 0, 1, 16, false),
 };
 
-static const struct mtk_pin_reg_calc mt6577_reg_cals[PINCTRL_PIN_REG_MAX] = {
-	[PINCTRL_PIN_REG_MODE] = MTK_RANGE(mt6577_pin_mode_range),
-	[PINCTRL_PIN_REG_DIR] = MTK_RANGE(mt6577_pin_dir_range),
-	[PINCTRL_PIN_REG_DO] = MTK_RANGE(mt6577_pin_do_range),
-	[PINCTRL_PIN_REG_DI] = MTK_RANGE(mt6577_pin_di_range),
-	[PINCTRL_PIN_REG_PULLEN] = MTK_RANGE(mt6577_pin_pullen_range),
-	[PINCTRL_PIN_REG_PULLSEL] = MTK_RANGE(mt6577_pin_pullsel_range),
+static const struct mtk_pin_reg_calc mt8377_reg_cals[PINCTRL_PIN_REG_MAX] = {
+	[PINCTRL_PIN_REG_MODE] = MTK_RANGE(mt8377_pin_mode_range),
+	[PINCTRL_PIN_REG_DIR] = MTK_RANGE(mt8377_pin_dir_range),
+	[PINCTRL_PIN_REG_DO] = MTK_RANGE(mt8377_pin_do_range),
+	[PINCTRL_PIN_REG_DI] = MTK_RANGE(mt8377_pin_di_range),
+	[PINCTRL_PIN_REG_PULLEN] = MTK_RANGE(mt8377_pin_pullen_range),
+	[PINCTRL_PIN_REG_PULLSEL] = MTK_RANGE(mt8377_pin_pullsel_range),
 };
 
-static const struct mtk_pin_desc mt6577_pins[] = {
+static const struct mtk_pin_desc mt8377_pins[] = {
 	MTK_PIN(0, "GPIO0", DRV_FIXED),
 	MTK_PIN(1, "GPIO1", DRV_FIXED),
 	MTK_PIN(2, "GPIO2", DRV_FIXED),
@@ -271,42 +271,43 @@ static const struct mtk_pin_desc mt6577_pins[] = {
 	MTK_PIN(231, "GPIO231", DRV_FIXED),
 };
 
-static const struct mtk_io_type_desc mt6577_io_type[] = {
+static const struct mtk_io_type_desc mt8377_io_type[] = {
 	{
-		.name = "mt6577",
+		.name = "mt8377",
 #if CONFIG_IS_ENABLED(PINCONF)
 		.bias_set = mtk_pinconf_bias_set_pullen_pullsel,
 #endif
 	},
 };
 
-static const struct mtk_pinctrl_soc mt6577_data = {
-	.name = "mt6577",
-	.reg_cal = mt6577_reg_cals,
-	.pins = mt6577_pins,
-	.npins = ARRAY_SIZE(mt6577_pins),
+static const struct mtk_pinctrl_soc mt8377_data = {
+	.name = "mt8377",
+	.reg_cal = mt8377_reg_cals,
+	.pins = mt8377_pins,
+	.npins = ARRAY_SIZE(mt8377_pins),
 	.gpio_mode = 0,
 	.rev = MTK_PINCTRL_V0,
-	.io_type = mt6577_io_type,
-	.ntype = ARRAY_SIZE(mt6577_io_type),
+	.io_type = mt8377_io_type,
+	.ntype = ARRAY_SIZE(mt8377_io_type),
 };
 
-static int mt6577_pinctrl_probe(struct udevice *dev)
+static int mt8377_pinctrl_probe(struct udevice *dev)
 {
-	return mtk_pinctrl_common_probe(dev, &mt6577_data);
+	return mtk_pinctrl_common_probe(dev, &mt8377_data);
 }
 
-static const struct udevice_id mt6577_pinctrl_match[] = {
+static const struct udevice_id mt8377_pinctrl_match[] = {
+	{ .compatible = "mediatek,mt8377-pinctrl" },
 	{ .compatible = "mediatek,mt6577-pinctrl" },
 	{ }
 };
 
-U_BOOT_DRIVER(mt6577_pinctrl) = {
-	.name = "mt6577_pinctrl",
+U_BOOT_DRIVER(mt8377_pinctrl) = {
+	.name = "mt8377_pinctrl",
 	.id = UCLASS_PINCTRL,
-	.of_match = mt6577_pinctrl_match,
+	.of_match = mt8377_pinctrl_match,
 	.ops = &mtk_pinctrl_ops,
 	.bind = mtk_pinctrl_common_bind,
-	.probe = mt6577_pinctrl_probe,
+	.probe = mt8377_pinctrl_probe,
 	.priv_auto = sizeof(struct mtk_pinctrl_priv),
 };

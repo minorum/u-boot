@@ -6,11 +6,11 @@ config PINCTRL_MTK
 	select SYSCON
 	bool
 
-config PINCTRL_MT6577
-	bool "MT6577 SoC pinctrl driver"
+config PINCTRL_MT8377
+	bool "MT8377 SoC pinctrl driver"
 	select PINCTRL_MTK
 	help
-	  Support MT6577 GPIO control through the MediaTek pin controller.
+	  Support MT8377 GPIO control through the MediaTek pin controller.
 	  Provide GPIO-mode selection, direction and pin value operations.
 	  Use the standard driver-model GPIO and pinctrl interfaces.
 	  Preserve firmware pin configuration until a GPIO is requested.
