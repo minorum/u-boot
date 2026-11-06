@@ -56,7 +56,7 @@
 };
 
 &wifi_mmc {
-	compatible = "mediatek,mt8377-mmc", "mediatek,mt6577-mmc";
+	compatible = "mediatek,mt8377-mmc";
 	reg = <0xc1240000 0x1000>;
 	clocks = <&pericfg CLK_MT8377_MSDC3>;
 	clock-names = "source";
