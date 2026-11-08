@@ -206,6 +206,15 @@ static int ncp1851_health(struct ncp1851 *chip)
 	return CHARGER_HEALTH_GOOD;
 }
 
+static int ncp1851_charge_code(struct ncp1851 *chip, int input)
+{
+	unsigned int limit = ncp1851_input_limits[input];
+
+	if (limit < 400000)
+		return 0;
+	return min(chip->ichg, (limit - 400000) / 100000);
+}
+
 static int ncp1851_configure(struct ncp1851 *chip, int input)
 {
 	int ret;
@@ -222,22 +231,23 @@ static int ncp1851_configure(struct ncp1851 *chip, int input)
 	if (ret)
 		return ret;
 	ret = ncp1851_update_bits(chip, NCP1851_IBAT, 0x7f,
-				  (chip->ieoc << 4) | chip->ichg);
+				  (chip->ieoc << 4) | ncp1851_charge_code(chip, input));
 	if (ret)
 		return ret;
 	return ncp1851_update_bits(chip, NCP1851_CTRL2, 0xef,
-				   (chip->power_path ? BIT(5) : 0) | BIT(1));
+				   (chip->power_path ? BIT(5) : 0) | BIT(1) |
+				   (input == 3 ? BIT(0) : 0));
 }
 
 static bool ncp1851_configured(struct ncp1851 *chip, int input)
 {
 	return (chip->regs[NCP1851_VREG] & 0x3f) == chip->vreg &&
 	       (chip->regs[NCP1851_IBAT] & 0x7f) ==
-		       ((chip->ieoc << 4) | chip->ichg) &&
+		       ((chip->ieoc << 4) | ncp1851_charge_code(chip, input)) &&
 	       (chip->regs[NCP1851_MISC] & 0x7f) ==
 		       ((chip->iweak << 5) | (chip->vsys << 2) | input) &&
 	       (chip->regs[NCP1851_CTRL2] & 0xef) ==
-		       ((chip->power_path ? BIT(5) : 0) | BIT(1)) &&
+		       ((chip->power_path ? BIT(5) : 0) | BIT(1) | (input == 3 ? BIT(0) : 0)) &&
 	       (chip->regs[NCP1851_CTRL1] & 0xbc) == NCP1851_TJ_WARN;
 }
 
