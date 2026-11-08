@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
+#include <clk.h>
 #include <dm.h>
 #include <dm/lists.h>
 #include <i2c.h>
 #include <power/pmic.h>
+
+struct mt6329_priv {
+	struct clk *clock;
+};
 
 static int mt6329_reg_count(struct udevice *dev)
 {
@@ -94,6 +99,7 @@ static int mt6329_disable_charger(struct udevice *dev)
 static int mt6329_probe(struct udevice *dev)
 {
 	static const uint registers[] = { 0, 1, 0x9b, 0xa7 };
+	struct mt6329_priv *priv = dev_get_priv(dev);
 	u8 data[4];
 	unsigned int i;
 	int ret;
@@ -107,9 +113,24 @@ static int mt6329_probe(struct udevice *dev)
 		return -ENODEV;
 	if ((data[2] | data[3]) & BIT(1))
 		return -EOPNOTSUPP;
-	if (dev_read_bool(dev, "mediatek,external-charger"))
-		return mt6329_disable_charger(dev);
-	return 0;
+	if (dev_read_bool(dev, "mediatek,external-charger")) {
+		ret = mt6329_disable_charger(dev);
+		if (ret)
+			return ret;
+	}
+	priv->clock = devm_clk_get_optional(dev, NULL);
+	if (IS_ERR(priv->clock))
+		return PTR_ERR(priv->clock);
+	if (!priv->clock)
+		return 0;
+	return clk_enable(priv->clock);
+}
+
+static int mt6329_remove(struct udevice *dev)
+{
+	struct mt6329_priv *priv = dev_get_priv(dev);
+
+	return priv->clock ? clk_disable(priv->clock) : 0;
 }
 
 static int mt6329_bind(struct udevice *dev)
@@ -154,5 +175,7 @@ U_BOOT_DRIVER(mt6329_pmic) = {
 	.of_match = mt6329_ids,
 	.bind = mt6329_bind,
 	.probe = mt6329_probe,
+	.remove = mt6329_remove,
+	.priv_auto = sizeof(struct mt6329_priv),
 	.ops = &mt6329_ops,
 };

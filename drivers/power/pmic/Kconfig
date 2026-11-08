@@ -14,7 +14,7 @@ if DM_PMIC
 
 config PMIC_MT6329
 	bool "MediaTek MT6329 PMIC"
-	depends on DM_I2C && DM_REGULATOR
+	depends on DM_I2C && DM_REGULATOR && CLK
 	help
 	  Enable MT6329 identity checks and restricted VUSB register access.
 
